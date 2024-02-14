@@ -1,0 +1,2 @@
+* Use API to download new data monthly. Pass 'Fields' parameter.
+* Check that outstanding amount always equals sum of issued amount grouped by Security Class 2 Description.
