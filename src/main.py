@@ -1,3 +1,12 @@
+import yaml
+import numpy as np
+import pandas as pd
+import pyarrow
+
+def load_config(config_path):
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
+
 def main():
     """
     Objective: Calculate US Gov't debt burden thru 2030.
@@ -9,7 +18,7 @@ def main():
 
     # 1. Read data from data/MSPD_DetailSecty*.csv.
     # 1a. Remove records with Maturity Date <= Issue Date
-    # 2. Collapse on 'Security Class 2 Description' aka unique ID
+    # 2. *** This is wrong, get more info from Joe Collapse on 'Security Class 2 Description' aka unique ID
     ## using average of yields weighted by issued amount.
     # 3. Add columns to collapsed dataframe for each calendar year
     ## and fill with interest to be paid on that debt for that year.
@@ -34,7 +43,54 @@ def main():
 
     note: 62 is the number of days left in the calendar year 2018
     """
-    pass
+    
+    # Load config
+    config_path = '/home/john/tlg/interest_model/src/config.yml'
+    config = load_config(config_path)
+
+    # Read data
+    usecols = [
+        'Security Type Description', # Marketable or Non-Marketable
+        'Security Class 1 Description', # Type of security
+        'Security Class 2 Description', 
+        'Interest Rate',
+        'Yield',
+        'Issue Date',
+        'Maturity Date',
+        'Issued Amount (in Millions)',
+        'Outstanding Amount (in Millions)',
+        'Fiscal Year',
+        'Fiscal Quarter Number',
+        'Calendar Year',
+        'Calendar Quarter Number',
+        'Calendar Month Number',
+        'Calendar Day Number'
+    ]
+    raw_data_path = config['raw_data_path']
+
+    df = pd.read_csv(raw_data_path, usecols=usecols)
+    print(df.head())
+    print(df.columns)
+    print(df.shape)
+
+    # Filter data
+    class_1_descriptions_to_keep = ('Notes', 'Bonds')
+    df = df[df['Security Class 1 Description'].isin(class_1_descriptions_to_keep)]
+    print(df.shape)
+
+    # Collapse data
+    # Group by Security Class 2 Description
+    # Sum Issued Amount
+    # Average Interest Rate
+    grouped_df = df.groupby('Security Class 2 Description').agg({
+        'Issued Amount (in Millions)': 'sum',
+        'Interest Rate': 'mean'
+    })
+    print(grouped_df.head())
+    print(grouped_df.columns)
+    print(grouped_df.shape)
+
+    # Left join 
 
 if __name__ == "__main__":
     main()

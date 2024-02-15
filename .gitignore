@@ -1,2 +1,4 @@
 data/
+venv/
 pat.txt
+config.yml
