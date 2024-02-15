@@ -1,3 +1,4 @@
+import sys
 import yaml
 import numpy as np
 import pandas as pd
@@ -27,6 +28,24 @@ def calculate_fraction_of_year_elapsed(_month: int, _day: int):
 
     return days_passed / total_days_in_year
 
+def calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date):
+    """
+    Use when Issue Date and Maturity Date are in the same calendar year.
+
+    Parameters:
+    issue_date: Pandas Datetime object
+    maturity_date: Pandas Datetime object
+
+    Returns: float (fraction of a year)
+    """
+    if issue_date.year != maturity_date.year:
+        raise ValueError("Dates must be within the same year when using calculate_fraction_of_year_between.")
+    
+    days_between = (maturity_date - issue_date).days
+    total_days_in_year = 365
+    
+    return days_between / total_days_in_year
+
 def process_raw_row(row): 
     """
     Iterates through the years a security was live and returns a dictionary
@@ -51,46 +70,65 @@ def process_raw_row(row):
         }
     }
     """
-    # Create a dict with keys being years between issue and maturity, inclusive.
-    year_issued = row['year_issued']
-    year_matured = row['year_matured']
-    interest_payments = {x: 0 for x in range(year_issued, year_matured+1)}
-
-    # Calculate year fractions for issue and mature years. 
-    month_issued = row['month_issued']
-    day_issued = row['day_issued']
-    month_matured = row['month_matured']
-    day_matured = row['day_matured']
-    fraction_of_year_remaining_after_issue = calculate_fraction_of_year_remaining(month_issued, day_issued)
-    fraction_of_year_elapsed_before_maturity = calculate_fraction_of_year_elapsed(month_matured, day_matured)
-
-    # Initialize interest rate variable.
-    # Bonds and Notes use interest rate. Bills don't have one; use yield.
+    
+    # Initialize variables
+    try:
+        ## Years, months, days
+        year_issued = row['year_issued']
+        month_issued = row['month_issued']
+        day_issued = row['day_issued']
+        year_matured = row['year_matured']
+        month_matured = row['month_matured']
+        day_matured = row['day_matured']
+    except KeyError:
+        print(f"Error in row:\n {row}")
+        sys.exit()
+    ## Issued amount
+    issue_amount = row['Issued Amount (in Millions)']
+    ## Is the security same-year or multi-year?
+    if year_issued == year_matured:
+        is_multi_year = False
+    else:
+        is_multi_year = True
+    ## Bonds and Notes use interest rate. Bills don't have one; use yield.
     if not np.isnan(row['Interest Rate']):
         interest_rate = row['Interest Rate'] / 100
 
     else:
         interest_rate = row['Yield'] / 100
-
-    # Calculate interest payments and update dict. 
-    issue_amount = row['Issued Amount (in Millions)']
-    for i,_year in enumerate(interest_payments.keys()):
-        if i == 0: # Year issued
-            interest_payment = fraction_of_year_remaining_after_issue * issue_amount * interest_rate
-        elif i == len(interest_payments.keys()) - 1: # Year matured
-            interest_payment = fraction_of_year_elapsed_before_maturity * issue_amount * interest_rate
-        else: # Full year
-            interest_payment = issue_amount * interest_rate
-        # Update dictionary
-        interest_payments.update({_year: interest_payment})
     
-    return {
+    # Initialize result dictionary
+    result = {
         'id': row['Security Class 2 Description'],
         'security_type': row['Security Class 1 Description'],
         'issue_date': row['Issue Date'],
-        'maturity_date': row['Maturity Date'],
-        'interest_paid': interest_payments
+        'maturity_date': row['Maturity Date']
     }
+    
+    # Calculate interest payment for same-year securities.
+    if not is_multi_year:
+        issue_date = row['Issue Date']
+        maturity_date = row['Maturity Date']
+        fraction_of_year_between_issue_and_maturity = calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date)
+        interest_payment = fraction_of_year_between_issue_and_maturity * issue_amount * interest_rate
+        # Update dictionary
+        result[str(year_issued)] = interest_payment
+
+    # Calculate interest payments for multi-year securities.
+    if is_multi_year:
+        fraction_of_year_remaining_after_issue = calculate_fraction_of_year_remaining(month_issued, day_issued)
+        fraction_of_year_elapsed_before_maturity = calculate_fraction_of_year_elapsed(month_matured, day_matured)
+        for _year in range(year_issued, year_matured+1):
+            if _year == year_issued:
+                interest_payment = fraction_of_year_remaining_after_issue * issue_amount * interest_rate
+            elif _year == year_matured:
+                interest_payment = fraction_of_year_elapsed_before_maturity * issue_amount * interest_rate
+            else: # Full year
+                interest_payment = issue_amount * interest_rate
+            # Update dictionary
+            result[str(_year)] = interest_payment
+    
+    return result
 
 
 def main():
@@ -149,7 +187,6 @@ def main():
     raw_data_path = config['raw_data_path']
 
     df = pd.read_csv(raw_data_path, usecols=usecols)
-    print(df.head())
     print(df.dtypes)
     print(df.shape)
 
@@ -180,9 +217,6 @@ def main():
     df['Issue Date'] = pd.to_datetime(df['Issue Date'])
     df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
 
-    print(df[['Issue Date', 'Maturity Date']].head())
-    print(df.dtypes)
-
     # Add year, month, day columns for interest payment calculation
     df['year_issued'] = df['Issue Date'].dt.year
     df['month_issued'] = df['Issue Date'].dt.month
@@ -190,42 +224,27 @@ def main():
     df['year_matured'] = df['Maturity Date'].dt.year
     df['month_matured'] = df['Maturity Date'].dt.month
     df['day_matured'] = df['Maturity Date'].dt.day
+    print(df.dtypes)
+
+    df.to_csv('sample.csv', index=False)
 
     # Process an example row
     result = process_raw_row(df.iloc[0,:])
     print(result)
 
-    df.to_csv('sample.csv', index=False)
-    # NOTE: Calculation needs to begin here; can't collapse data because
-    # The security can be added on to. 
-    # Create a function that takes a single security, iterates, and outputs
-    # a dict with:
+    # Gather list of processed rows.
+    processed_rows = df.apply(process_raw_row, axis=1)
+    print(f"Processed {len(processed_rows)} rows.")
+    # Recombine into DataFrame with each year having its own column.
+
+
+
+
+
+
+
+
     """
-    {
-        id: 938848,
-        security_type: bond,
-        initial_issue_date: 1/1/2020,
-        maturity_date: 1/1/2024,
-        interest_paid:
-        {
-            2020: 80,
-            2021: 100,
-            2022: 100,
-            2023: 100,
-            2024: 20
-        }
-    }
-    """
-    # then create a dataframe from this dict with the necessary columns for each year
-
-
-
-
-
-
-
-
-
     # Collapse data
     # Group by Security Class 2 Description
     # Sum Issued Amount
@@ -254,6 +273,7 @@ def main():
     # Left join 
 
     # Add issue date calendar year
+    """
 
 if __name__ == "__main__":
     main()
