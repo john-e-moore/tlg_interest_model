@@ -60,29 +60,20 @@ def process_raw_row(row):
         security_type: bond,
         initial_issue_date: 1/1/2020,
         maturity_date: 1/1/2024,
-        interest_paid:
-        {
-            2020: 80,
-            2021: 100,
-            2022: 100,
-            2023: 100,
-            2024: 20
-        }
+        '2020': 365,
+        '2021': 365,
+        ...
     }
     """
     
     # Initialize variables
-    try:
-        ## Years, months, days
-        year_issued = row['year_issued']
-        month_issued = row['month_issued']
-        day_issued = row['day_issued']
-        year_matured = row['year_matured']
-        month_matured = row['month_matured']
-        day_matured = row['day_matured']
-    except KeyError:
-        print(f"Error in row:\n {row}")
-        sys.exit()
+    ## Years, months, days
+    year_issued = row['year_issued']
+    month_issued = row['month_issued']
+    day_issued = row['day_issued']
+    year_matured = row['year_matured']
+    month_matured = row['month_matured']
+    day_matured = row['day_matured']
     ## Issued amount
     issue_amount = row['Issued Amount (in Millions)']
     ## Is the security same-year or multi-year?
@@ -130,7 +121,6 @@ def process_raw_row(row):
     
     return result
 
-
 def main():
     """
     Objective: Calculate US Gov't debt burden thru 2030.
@@ -168,11 +158,11 @@ def main():
     note: 62 is the number of days left in the calendar year 2018
     """
     
-    # Load config
+    # Load config.
     config_path = '/home/john/tlg/interest_model/src/config.yml'
     config = load_config(config_path)
 
-    # Read data
+    # Read data.
     usecols = [
         'Security Type Description', # Marketable or Non-Marketable
         'Security Class 1 Description', # Type of security
@@ -190,52 +180,55 @@ def main():
     print(df.dtypes)
     print(df.shape)
 
-    # Filter data
-    # Only keep non-TIPS, non-FSN marketable securities
+    # Filter data.
+    # Only keep non-TIPS, non-FSN marketable securities.
     class_1_descriptions_to_keep = ('Notes', 'Bonds', 'Bills Maturity Value')
     df = df[df['Security Class 1 Description'].isin(class_1_descriptions_to_keep)]
     print("Non-marketable securites, TIPS, and FSN's removed.")
     print(df.shape)
-    # Drop duplicates
-    # Raw data seems to be append-only, so same security can have multiple rows
-    # But, securities can be re-issued (added onto) at a later date
+    # Drop duplicates.
+    # Raw data seems to be append-only, so same security can have multiple rows.
+    # But, securities can be re-issued (added onto) at a later date.
     subset = ['Security Class 2 Description', 'Issue Date']
     df.drop_duplicates(subset=subset, keep='first', inplace=True)
     print("Duplicates dropped.")
     print(df.shape)
-    # Remove totals
+    # Remove totals.
     df = df[~df['Security Class 2 Description'].str.contains('Total')]
     print("Totals records removed.")
     print(df.shape)
 
-    # Change columns to numeric
+    # Change columns to numeric.
     df['Issued Amount (in Millions)'] = pd.to_numeric(df['Issued Amount (in Millions)'])
     df['Outstanding Amount (in Millions)'] = pd.to_numeric(df['Outstanding Amount (in Millions)'])
 
-    # Change columns to datetime after dropping nulls
+    # Change columns to datetime after dropping nulls.
     df.dropna(subset=['Issue Date', 'Maturity Date'], inplace=True) # (1)
     df['Issue Date'] = pd.to_datetime(df['Issue Date'])
     df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
 
-    # Add year, month, day columns for interest payment calculation
+    # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
     df['month_issued'] = df['Issue Date'].dt.month
     df['day_issued'] = df['Issue Date'].dt.day
     df['year_matured'] = df['Maturity Date'].dt.year
     df['month_matured'] = df['Maturity Date'].dt.month
     df['day_matured'] = df['Maturity Date'].dt.day
-    print(df.dtypes)
 
-    df.to_csv('sample.csv', index=False)
-
-    # Process an example row
-    result = process_raw_row(df.iloc[0,:])
-    print(result)
-
-    # Gather list of processed rows.
+    # Calculate interest payments on each security, then recombine
+    # the resulting Series into a DataFrame with columns added for
+    # each year's interest payments.
     processed_rows = df.apply(process_raw_row, axis=1)
-    print(f"Processed {len(processed_rows)} rows.")
-    # Recombine into DataFrame with each year having its own column.
+    df_yearly = pd.DataFrame(processed_rows.tolist())
+
+    # Reorder year columns
+    # Identify year columns and non-year columns
+    year_columns = [col for col in df_yearly.columns if col.isdigit() and 1900 <= int(col) <= 2100]
+    non_year_columns = [col for col in df_yearly.columns if col not in year_columns]
+    sorted_year_columns = sorted(year_columns, key=lambda x: int(x))
+    df_yearly_sorted = df[non_year_columns + sorted_year_columns]
+    
+    df_yearly_sorted.to_csv('yearly_sorted.csv', index=False)
 
 
 
