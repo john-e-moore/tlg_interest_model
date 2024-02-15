@@ -207,6 +207,9 @@ def main():
     df['Issue Date'] = pd.to_datetime(df['Issue Date'])
     df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
 
+    # TODO: from now to 2030, when a security matures, reissue it (add a row)
+    # for the same term at a 5% interest rate (should be parameter)
+
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
     df['month_issued'] = df['Issue Date'].dt.month
@@ -226,47 +229,25 @@ def main():
     year_columns = [col for col in df_yearly.columns if col.isdigit() and 1900 <= int(col) <= 2100]
     non_year_columns = [col for col in df_yearly.columns if col not in year_columns]
     sorted_year_columns = sorted(year_columns, key=lambda x: int(x))
-    df_yearly_sorted = df[non_year_columns + sorted_year_columns]
+    df_yearly_sorted = df_yearly[non_year_columns + sorted_year_columns]
+    print("Sorted year columns.")
+    print(df_yearly_sorted.shape)
     
-    df_yearly_sorted.to_csv('yearly_sorted.csv', index=False)
+    # Sum yearly interest payments by id.
+    df_yearly_sorted.drop(['issue_date', 'maturity_date'], axis=1, inplace=True)
+    id_grouped_df = df_yearly_sorted.groupby(['id', 'security_type'], as_index=False).sum()
+    print("Grouped securities by id, summing yearly interest payments.")
+    print(id_grouped_df.shape)
 
+    id_grouped_df.to_csv('id_grouped.csv', index=False)
 
+    # Pivot sum of yearly interest payments on security type.
+    id_grouped_df.drop('id', axis=1, inplace=True)
+    df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
+    pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["security_type", "year"], aggfunc='sum')
 
+    pivot_table.to_csv('result.csv')
 
-
-
-
-
-    """
-    # Collapse data
-    # Group by Security Class 2 Description
-    # Sum Issued Amount
-    # Average Interest Rate
-    grouped_df = df.groupby('Security Class 2 Description').agg({
-        'Issued Amount (in Millions)': 'sum',
-        'Interest Rate': 'mean',
-        'Yield': 'mean'
-    })
-    grouped_df = df.groupby('Security Class 2 Description').agg({
-        'Security Class 2 Description': 'count',
-        'Issued Amount (in Millions)': 'sum',
-        'Interest Rate': 'mean',
-        'Yield': 'mean'
-    })
-    print(grouped_df.head(20))
-    print(grouped_df.columns)
-    print(grouped_df.shape)
-
-    # Examine why there are still duplicate IDs
-    test_df = df[df['Security Class 2 Description'] == '912757VP3']
-    print(test_df)
-    # Maturity dates are all the same, but issue date is not
-    # 
-
-    # Left join 
-
-    # Add issue date calendar year
-    """
 
 if __name__ == "__main__":
     main()
