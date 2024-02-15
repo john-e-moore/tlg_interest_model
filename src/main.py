@@ -209,6 +209,11 @@ def main():
 
     # TODO: from now to 2030, when a security matures, reissue it (add a row)
     # for the same term at a 5% interest rate (should be parameter)
+    # The multiple row securities should be reissued for the full
+    # outstanding amount.
+    # Iterate one day at a time, starting at max 'record date'
+    # df = df[df['Maturity Date'] == date]
+    # Add new row with all the columns
 
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
@@ -247,6 +252,8 @@ def main():
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["security_type", "year"], aggfunc='sum')
 
     pivot_table.to_csv('result.csv')
+
+    # TODO: split code into reissuance and interest payments modules
 
 
 if __name__ == "__main__":
