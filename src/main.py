@@ -121,14 +121,61 @@ def process_raw_row(row) -> dict:
     
     return result
 
-def reissue_security(max_record_date, row) -> pd.DataFrame:
+def find_closest_value(number: float, values: list) -> int:
+    """
+    Used to find interest rate value from dictionary. Takes
+    the term in years of the security, then matches it to the nearest
+    integer in 'values' (the keys of interest_rates_dict)
+    """
+    diffs = list(map(lambda x: abs(x - number), values))
+    return min(diffs)
+
+def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     """
     All securities issued before max_record_date are already in the data,
     so we start reissuing one day later.
+
+    Returns DataFrame
     """
     reissue_start_date = max_record_date + pd.Timedelta(days=1)
+    reissue_end_date = pd.to_datetime('2049-12-31')
+
+    # Calculate interest rate from term
     term_days = row['term_days']
+    term_years = term_days / 365
+    interest_rate = find_closest_value(term_years, list(interest_rates_dict.keys()))
+
+    # Initialize DataFrame
+    colnames = [
+        'Security Class 1 Description',
+        'Security Class 2 Description',
+        'Interest Rate',
+        'Yield',
+        'Issue Date',
+        'Maturity Date',
+        'Issued Amount (in Millions)'
+    ]
+    df = pd.DataFrame(columns=colnames)
+    # Fill DataFrame with reissued securities until 2050
+    security_class_1_description = row['Security Class 1 Description']
+    security_class_2_description = row['Security Class 2 Description']
+    issued_amount = row['Issued Amount (in Millions)']
+    current_issue_date = row['Maturity Date'] + pd.Timedelta(days=1)
+    while current_issue_date <= reissue_end_date:
+        current_maturity_date = current_issue_date + pd.Timedelta(days=term_days)
+        df.loc[len(df)] = {
+            'Security Class 1 Description': security_class_1_description,
+            'Security Class 2 Description': security_class_2_description,
+            'Interest Rate': interest_rate,
+            'Yield': interest_rate,
+            'Issue Date': current_issue_date,
+            'Maturity Date': current_maturity_date,
+            'Issued Amount (in Millions)': issued_amount
+        }
+        current_issue_date += pd.Timedelta(days=term_days)
     
+    return df
+
 
 def main():
     """
@@ -174,7 +221,7 @@ def main():
     # Read data.
     usecols = [
         'Record Date',
-        'Security Type Description', # Marketable or Non-Marketable
+        #'Security Type Description', # Marketable or Non-Marketable
         'Security Class 1 Description', # Type of security
         'Security Class 2 Description', # CUSIP ID number (unique for each security)
         'Interest Rate',
@@ -182,7 +229,7 @@ def main():
         'Issue Date',
         'Maturity Date',
         'Issued Amount (in Millions)', # Read as non-numeric due to *
-        'Outstanding Amount (in Millions)', # Read as non-numeric due to *
+        #'Outstanding Amount (in Millions)', # Read as non-numeric due to *
     ]
     raw_data_path = config['raw_data_path']
 
@@ -216,7 +263,7 @@ def main():
 
     # Change columns to numeric.
     df['Issued Amount (in Millions)'] = pd.to_numeric(df['Issued Amount (in Millions)'])
-    df['Outstanding Amount (in Millions)'] = pd.to_numeric(df['Outstanding Amount (in Millions)'])
+    #df['Outstanding Amount (in Millions)'] = pd.to_numeric(df['Outstanding Amount (in Millions)'])
 
     # Change columns to datetime after dropping nulls.
     df.dropna(subset=['Issue Date', 'Maturity Date'], inplace=True) # (1)
@@ -233,9 +280,38 @@ def main():
     # Add new row with all the columns
     max_record_date = df['Record Date'].max()
     print(f"Max record date: {max_record_date}")
+    df.drop('Record Date', axis=1, inplace=True)
 
     # Security term in days
     df['term_days'] = (df['Maturity Date'] - df['Issue Date']).dt.days
+    # This line ensures the reissue function doesn't run forever
+    df = df[df['term_days'] > 0]
+    print(df.columns)
+
+    # term: rate
+    interest_rates_dict = {
+        1: .05, # 1 year or less
+        2: .05,
+        3: .05,
+        5: .05,
+        7: .05,
+        10: .05,
+        20: .05,
+        30: .05
+    }
+    # Apply reissue function here (will return Series of Dataframes(?))
+    test_df = df[df['Security Class 2 Description'] == '912797JF5']
+    test_reissue = test_df.apply(
+        func=reissue_security,
+        axis=1,
+        args=(interest_rates_dict, max_record_date))
+    print(test_reissue)
+    print(type(test_reissue))
+    print(len(test_reissue))
+    test_reissue.to_csv('test_reissue.csv')
+    sys.exit()
+
+    # Concat the new dataframes with the original one.
 
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
