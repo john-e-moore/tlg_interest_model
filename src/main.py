@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pyarrow
 
-def load_config(config_path):
+def load_config(config_path: str) -> dict:
     with open(config_path, 'r') as file:
         return yaml.safe_load(file)
 
-def calculate_fraction_of_year_remaining(_month: int, _day: int):
+def calculate_fraction_of_year_remaining(_month: int, _day: int) -> float:
     """Use for issuing year."""
     days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     total_days_in_year = 365
@@ -18,7 +18,7 @@ def calculate_fraction_of_year_remaining(_month: int, _day: int):
 
     return (total_days_in_year - days_passed) / total_days_in_year
 
-def calculate_fraction_of_year_elapsed(_month: int, _day: int):
+def calculate_fraction_of_year_elapsed(_month: int, _day: int) -> float:
     """Use for maturing year."""
     days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     total_days_in_year = 365
@@ -28,7 +28,7 @@ def calculate_fraction_of_year_elapsed(_month: int, _day: int):
 
     return days_passed / total_days_in_year
 
-def calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date):
+def calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date) -> float:
     """
     Use when Issue Date and Maturity Date are in the same calendar year.
 
@@ -46,7 +46,7 @@ def calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_d
     
     return days_between / total_days_in_year
 
-def process_raw_row(row): 
+def process_raw_row(row) -> dict: 
     """
     Iterates through the years a security was live and returns a dictionary
     containing the interest payment for each year.
@@ -121,9 +121,18 @@ def process_raw_row(row):
     
     return result
 
+def reissue_security(max_record_date, row) -> pd.DataFrame:
+    """
+    All securities issued before max_record_date are already in the data,
+    so we start reissuing one day later.
+    """
+    reissue_start_date = max_record_date + pd.Timedelta(days=1)
+    term_days = row['term_days']
+    
+
 def main():
     """
-    Objective: Calculate US Gov't debt burden thru 2030.
+    Objective: Calculate US Gov't debt burden thru 2050.
 
     Assumptions:
     * 5% interest rate when debt gets reissued.
@@ -164,6 +173,7 @@ def main():
 
     # Read data.
     usecols = [
+        'Record Date',
         'Security Type Description', # Marketable or Non-Marketable
         'Security Class 1 Description', # Type of security
         'Security Class 2 Description', # CUSIP ID number (unique for each security)
@@ -182,7 +192,13 @@ def main():
 
     # Filter data.
     # Only keep non-TIPS, non-FSN marketable securities.
-    class_1_descriptions_to_keep = ('Notes', 'Bonds', 'Bills Maturity Value')
+    class_1_descriptions_to_keep = (
+        'Notes', 
+        'Bonds', 
+        'Bills Maturity Value',
+        #'Inflation-Protected Securities',
+        #'Floating Rate Notes'
+    )
     df = df[df['Security Class 1 Description'].isin(class_1_descriptions_to_keep)]
     print("Non-marketable securites, TIPS, and FSN's removed.")
     print(df.shape)
@@ -206,14 +222,20 @@ def main():
     df.dropna(subset=['Issue Date', 'Maturity Date'], inplace=True) # (1)
     df['Issue Date'] = pd.to_datetime(df['Issue Date'])
     df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
+    df['Record Date'] = pd.to_datetime(df['Record Date'])
 
-    # TODO: from now to 2030, when a security matures, reissue it (add a row)
+    # TODO: from now to 2050, when a security matures, reissue it (add a row)
     # for the same term at a 5% interest rate (should be parameter)
     # The multiple row securities should be reissued for the full
     # outstanding amount.
     # Iterate one day at a time, starting at max 'record date'
     # df = df[df['Maturity Date'] == date]
     # Add new row with all the columns
+    max_record_date = df['Record Date'].max()
+    print(f"Max record date: {max_record_date}")
+
+    # Security term in days
+    df['term_days'] = (df['Maturity Date'] - df['Issue Date']).dt.days
 
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
@@ -229,8 +251,7 @@ def main():
     processed_rows = df.apply(process_raw_row, axis=1)
     df_yearly = pd.DataFrame(processed_rows.tolist())
 
-    # Reorder year columns
-    # Identify year columns and non-year columns
+    # Reorder year columns.
     year_columns = [col for col in df_yearly.columns if col.isdigit() and 1900 <= int(col) <= 2100]
     non_year_columns = [col for col in df_yearly.columns if col not in year_columns]
     sorted_year_columns = sorted(year_columns, key=lambda x: int(x))
@@ -238,10 +259,10 @@ def main():
     print("Sorted year columns.")
     print(df_yearly_sorted.shape)
     
-    # Sum yearly interest payments by id.
+    # Sum yearly interest payments by id and security type.
     df_yearly_sorted.drop(['issue_date', 'maturity_date'], axis=1, inplace=True)
     id_grouped_df = df_yearly_sorted.groupby(['id', 'security_type'], as_index=False).sum()
-    print("Grouped securities by id, summing yearly interest payments.")
+    print("Grouped securities by id and security type, summing yearly interest payments.")
     print(id_grouped_df.shape)
 
     id_grouped_df.to_csv('id_grouped.csv', index=False)
@@ -250,8 +271,11 @@ def main():
     id_grouped_df.drop('id', axis=1, inplace=True)
     df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["security_type", "year"], aggfunc='sum')
+    pivot_table.to_csv('result_by_security_type_no_reissue.csv')
+    # Pivot year only, not security type.
+    pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
+    pivot_table.to_csv('result_no_reissue.csv')
 
-    pivot_table.to_csv('result.csv')
 
     # TODO: split code into reissuance and interest payments modules
 
