@@ -1,2 +1,3 @@
 * Change to fiscal year instead of calendar year.
-* Use API to download new data monthly. Pass 'Fields' parameter.
+* Split code into modules (utils, simulate_reissuance, calculate_interest_payments)
+* Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.

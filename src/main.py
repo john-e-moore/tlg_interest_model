@@ -1,4 +1,5 @@
 import sys
+import time
 import yaml
 import numpy as np
 import pandas as pd
@@ -137,15 +138,20 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
 
     Returns DataFrame
     """
+    # Initialize variables
     reissue_start_date = max_record_date + pd.Timedelta(days=1)
     reissue_end_date = pd.to_datetime('2049-12-31')
-
-    # Calculate interest rate from term
+    ## Calculate interest rate from term
     term_days = row['term_days']
     term_years = term_days / 365
     interest_rate = find_closest_value(term_years, list(interest_rates_dict.keys()))
+    ## Other loop variables
+    security_class_1_description = row['Security Class 1 Description']
+    security_class_2_description = row['Security Class 2 Description']
+    issued_amount = row['Issued Amount (in Millions)']
+    current_issue_date = row['Maturity Date'] + pd.Timedelta(days=1)
 
-    # Initialize DataFrame
+    # Initialize result DataFrame
     colnames = [
         'Security Class 1 Description',
         'Security Class 2 Description',
@@ -156,11 +162,8 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
         'Issued Amount (in Millions)'
     ]
     df = pd.DataFrame(columns=colnames)
-    # Fill DataFrame with reissued securities until 2050
-    security_class_1_description = row['Security Class 1 Description']
-    security_class_2_description = row['Security Class 2 Description']
-    issued_amount = row['Issued Amount (in Millions)']
-    current_issue_date = row['Maturity Date'] + pd.Timedelta(days=1)
+
+    # Fill DataFrame with securities reissued until 2050
     while current_issue_date <= reissue_end_date:
         current_maturity_date = current_issue_date + pd.Timedelta(days=term_days)
         df.loc[len(df)] = {
@@ -286,8 +289,19 @@ def main():
     df['term_days'] = (df['Maturity Date'] - df['Issue Date']).dt.days
     # This line ensures the reissue function doesn't run forever
     df = df[df['term_days'] > 0]
-    print(df.columns)
+    print("Negative term records removed.")
+    print(df.shape)
 
+    # Count how many bonds/bills/notes
+    value_counts = df['Security Class 1 Description'].value_counts()
+    print("Value counts:")
+    print(value_counts)
+    # Average bill term in days
+    for description in class_1_descriptions_to_keep:
+        term_avg = df['term_days'][df['Security Class 1 Description'] == description].mean()
+        print(f"Average {description} term: {int(term_avg)} days")
+
+    # TODO: store interest_rates_dict in config
     # term: rate
     interest_rates_dict = {
         1: .05, # 1 year or less
@@ -299,19 +313,43 @@ def main():
         20: .05,
         30: .05
     }
-    # Apply reissue function here (will return Series of Dataframes(?))
-    test_df = df[df['Security Class 2 Description'] == '912797JF5']
+    # Apply reissue function here (will return Series of Dataframes)
+    #test_df = df[df['Security Class 1 Description'] == 'Bills Maturity Value'].reset_index()
+    #test_df = df[df['Security Class 2 Description'] == '912796MH9']
+    #print(f"Number of securities in test data before reissuing: {len(test_df)}")
+    print("Simulating reissuance...")
+    # TODO: can't figure out why .apply was taking so long; use for loop
+    # and then try .apply again.
+    """
     test_reissue = test_df.apply(
         func=reissue_security,
         axis=1,
         args=(interest_rates_dict, max_record_date))
-    print(test_reissue)
-    print(type(test_reissue))
-    print(len(test_reissue))
-    test_reissue.to_csv('test_reissue.csv')
-    sys.exit()
+    """
+    start_time = time.time()
+    cum_rows = 0
+    df_list = []
+    for i,row in df.iterrows():
+        x = reissue_security(row, interest_rates_dict, max_record_date)
+        cum_rows += len(x)
+        df_list.append(x)
+        if (i+1)%500 == 0:
+            print(f"{i+1} records processed. Cumulative rows: {cum_rows}")
+        #time.sleep(1)
+    end_time = time.time()
+    print(f"Simulating reissuance took {(end_time - start_time) / 60} minutes.")
+    print("Complete. Concatenating results...")
+    #test_reissue_result = pd.concat(test_reissue.tolist(), axis=0, ignore_index=True)
+    reissue_result = pd.concat(df_list, axis=0, ignore_index=True)
+    print("Complete.")
+    print(f"Number of reissued securities in test data: {len(reissue_result)}")
+    total_memory_gb = reissue_result.memory_usage(deep=True).sum() / (1024*3)
+    print(f"Memory usage: {total_memory_gb}")
+    reissue_result.to_csv('test_reissue_result.csv')
 
-    # Concat the new dataframes with the original one.
+    # TODO: Concat the new dataframes with the original one.
+    df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
+    print(f"Number of rows after combining: {len(df)}")
 
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
@@ -324,8 +362,11 @@ def main():
     # Calculate interest payments on each security, then recombine
     # the resulting Series into a DataFrame with columns added for
     # each year's interest payments.
+    start_time = time.time()
     processed_rows = df.apply(process_raw_row, axis=1)
     df_yearly = pd.DataFrame(processed_rows.tolist())
+    start_time = time.time()
+    print(f"Processing rows took {(end_time - start_time) / 60} minutes.")
 
     # Reorder year columns.
     year_columns = [col for col in df_yearly.columns if col.isdigit() and 1900 <= int(col) <= 2100]
@@ -347,10 +388,10 @@ def main():
     id_grouped_df.drop('id', axis=1, inplace=True)
     df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["security_type", "year"], aggfunc='sum')
-    pivot_table.to_csv('result_by_security_type_no_reissue.csv')
+    pivot_table.to_csv('result_by_security_type.csv')
     # Pivot year only, not security type.
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
-    pivot_table.to_csv('result_no_reissue.csv')
+    pivot_table.to_csv('result.csv')
 
 
     # TODO: split code into reissuance and interest payments modules
