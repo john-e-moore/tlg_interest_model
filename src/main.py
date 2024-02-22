@@ -140,6 +140,9 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     """
     # Initialize variables
     reissue_start_date = max_record_date + pd.Timedelta(days=1)
+    ## Exit if maturity date is before most recent record (would already be in data)
+    if reissue_start_date > row['Maturity Date']:
+        return None
     reissue_end_date = pd.to_datetime('2049-12-31')
     ## Calculate interest rate from term
     term_days = row['term_days']
@@ -317,6 +320,8 @@ def main():
     #test_df = df[df['Security Class 1 Description'] == 'Bills Maturity Value'].reset_index()
     #test_df = df[df['Security Class 2 Description'] == '912796MH9']
     #print(f"Number of securities in test data before reissuing: {len(test_df)}")
+    # Reset index
+    df.reset_index(inplace=True, drop=True)
     print("Simulating reissuance...")
     # TODO: can't figure out why .apply was taking so long; use for loop
     # and then try .apply again.
@@ -331,10 +336,11 @@ def main():
     df_list = []
     for i,row in df.iterrows():
         x = reissue_security(row, interest_rates_dict, max_record_date)
-        cum_rows += len(x)
-        df_list.append(x)
+        if x is not None:
+            cum_rows += len(x)
+            df_list.append(x)
         if (i+1)%500 == 0:
-            print(f"{i+1} records processed. Cumulative rows: {cum_rows}")
+            print(f"{i+1} records processed. Cumulative new rows: {cum_rows}")
         #time.sleep(1)
     end_time = time.time()
     print(f"Simulating reissuance took {(end_time - start_time) / 60} minutes.")
@@ -342,10 +348,10 @@ def main():
     #test_reissue_result = pd.concat(test_reissue.tolist(), axis=0, ignore_index=True)
     reissue_result = pd.concat(df_list, axis=0, ignore_index=True)
     print("Complete.")
-    print(f"Number of reissued securities in test data: {len(reissue_result)}")
+    print(f"Number of reissued securities in data: {len(reissue_result)}")
     total_memory_gb = reissue_result.memory_usage(deep=True).sum() / (1024*3)
     print(f"Memory usage: {total_memory_gb}")
-    reissue_result.to_csv('test_reissue_result.csv')
+    reissue_result.to_csv('reissue_result.csv')
 
     # TODO: Concat the new dataframes with the original one.
     df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
@@ -365,7 +371,7 @@ def main():
     start_time = time.time()
     processed_rows = df.apply(process_raw_row, axis=1)
     df_yearly = pd.DataFrame(processed_rows.tolist())
-    start_time = time.time()
+    end_time = time.time()
     print(f"Processing rows took {(end_time - start_time) / 60} minutes.")
 
     # Reorder year columns.
