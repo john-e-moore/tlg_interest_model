@@ -1,3 +1,4 @@
+* Reissue maybe buggy? Numbers start decreasing after 2023.
 * Change to fiscal year instead of calendar year.
 * Split code into modules (utils, simulate_reissuance, calculate_interest_payments)
 * Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.

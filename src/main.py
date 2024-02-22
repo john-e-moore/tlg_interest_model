@@ -141,8 +141,8 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     # Initialize variables
     reissue_start_date = max_record_date + pd.Timedelta(days=1)
     ## Exit if maturity date is before most recent record (would already be in data)
-    if reissue_start_date > row['Maturity Date']:
-        return None
+    #if reissue_start_date > row['Maturity Date']:
+    #    return None
     reissue_end_date = pd.to_datetime('2049-12-31')
     ## Calculate interest rate from term
     term_days = row['term_days']
@@ -277,13 +277,7 @@ def main():
     df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
     df['Record Date'] = pd.to_datetime(df['Record Date'])
 
-    # TODO: from now to 2050, when a security matures, reissue it (add a row)
-    # for the same term at a 5% interest rate (should be parameter)
-    # The multiple row securities should be reissued for the full
-    # outstanding amount.
-    # Iterate one day at a time, starting at max 'record date'
-    # df = df[df['Maturity Date'] == date]
-    # Add new row with all the columns
+    # Max record date; don't need to reissue anything that matures before this.
     max_record_date = df['Record Date'].max()
     print(f"Max record date: {max_record_date}")
     df.drop('Record Date', axis=1, inplace=True)
@@ -321,15 +315,19 @@ def main():
     #test_df = df[df['Security Class 2 Description'] == '912796MH9']
     #print(f"Number of securities in test data before reissuing: {len(test_df)}")
     # Reset index
-    df.reset_index(inplace=True, drop=True)
+    print(f"DF length: {len(df)}")
+    reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
+    print(f"Reissue df length: {len(reissue_df)}")
+    #df.reset_index(inplace=True, drop=True)
     print("Simulating reissuance...")
     # TODO: can't figure out why .apply was taking so long; use for loop
     # and then try .apply again.
-    """
-    test_reissue = test_df.apply(
+    start_time = time.time()
+    reissue_list = reissue_df.apply(
         func=reissue_security,
         axis=1,
-        args=(interest_rates_dict, max_record_date))
+        args=(interest_rates_dict, max_record_date)).tolist()
+    end_time = time.time()
     """
     start_time = time.time()
     cum_rows = 0
@@ -343,10 +341,11 @@ def main():
             print(f"{i+1} records processed. Cumulative new rows: {cum_rows}")
         #time.sleep(1)
     end_time = time.time()
+    """
     print(f"Simulating reissuance took {(end_time - start_time) / 60} minutes.")
     print("Complete. Concatenating results...")
     #test_reissue_result = pd.concat(test_reissue.tolist(), axis=0, ignore_index=True)
-    reissue_result = pd.concat(df_list, axis=0, ignore_index=True)
+    reissue_result = pd.concat(reissue_list, axis=0, ignore_index=True)
     print("Complete.")
     print(f"Number of reissued securities in data: {len(reissue_result)}")
     total_memory_gb = reissue_result.memory_usage(deep=True).sum() / (1024*3)
