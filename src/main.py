@@ -147,7 +147,7 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     ## Calculate interest rate from term
     term_days = row['term_days']
     term_years = term_days / 365
-    interest_rate = find_closest_value(term_years, list(interest_rates_dict.keys()))
+    interest_rate = interest_rates_dict.get(find_closest_value(term_years, list(interest_rates_dict.keys())))
     ## Other loop variables
     security_class_1_description = row['Security Class 1 Description']
     security_class_2_description = row['Security Class 2 Description']
