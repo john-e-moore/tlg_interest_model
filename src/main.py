@@ -129,7 +129,7 @@ def find_closest_value(number: float, values: list) -> int:
     integer in 'values' (the keys of interest_rates_dict)
     """
     diffs = list(map(lambda x: abs(x - number), values))
-    return min(diffs)
+    return diffs.index(min(diffs))
 
 def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     """
@@ -301,14 +301,14 @@ def main():
     # TODO: store interest_rates_dict in config
     # term: rate
     interest_rates_dict = {
-        1: .05, # 1 year or less
-        2: .05,
-        3: .05,
-        5: .05,
-        7: .05,
-        10: .05,
-        20: .05,
-        30: .05
+        1: 5, # 1 year or less
+        2: 5,
+        3: 5,
+        5: 5,
+        7: 5,
+        10: 5,
+        20: 5,
+        30: 5
     }
     # Apply reissue function here (will return Series of Dataframes)
     #test_df = df[df['Security Class 1 Description'] == 'Bills Maturity Value'].reset_index()
@@ -317,7 +317,7 @@ def main():
     # Reset index
     print(f"DF length: {len(df)}")
     reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
-    print(f"Reissue df length: {len(reissue_df)}")
+    print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
     #df.reset_index(inplace=True, drop=True)
     print("Simulating reissuance...")
     # TODO: can't figure out why .apply was taking so long; use for loop
@@ -342,7 +342,7 @@ def main():
         #time.sleep(1)
     end_time = time.time()
     """
-    print(f"Simulating reissuance took {(end_time - start_time) / 60} minutes.")
+    print(f"Simulating reissuance took {round((end_time - start_time), 1)} seconds.")
     print("Complete. Concatenating results...")
     #test_reissue_result = pd.concat(test_reissue.tolist(), axis=0, ignore_index=True)
     reissue_result = pd.concat(reissue_list, axis=0, ignore_index=True)
@@ -355,6 +355,7 @@ def main():
     # TODO: Concat the new dataframes with the original one.
     df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
     print(f"Number of rows after combining: {len(df)}")
+    df.to_csv('concat_after_reissue.csv')
 
     # Add year, month, day columns for interest payment calculation.
     df['year_issued'] = df['Issue Date'].dt.year
