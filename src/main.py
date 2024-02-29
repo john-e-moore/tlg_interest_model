@@ -122,11 +122,11 @@ def process_raw_row(row) -> dict:
     
     return result
 
-def find_closest_value(number: float, values: list) -> int:
+def find_closest_value_index(number: float, values: list) -> int:
     """
     Used to find interest rate value from dictionary. Takes
-    the term in years of the security, then matches it to the nearest
-    integer in 'values' (the keys of interest_rates_dict)
+    the term in years of the security, then matches it to the index of 
+    the nearest integer in 'values' (the keys of interest_rates_dict)
     """
     diffs = list(map(lambda x: abs(x - number), values))
     return diffs.index(min(diffs))
@@ -143,11 +143,13 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     ## Exit if maturity date is before most recent record (would already be in data)
     #if reissue_start_date > row['Maturity Date']:
     #    return None
-    reissue_end_date = pd.to_datetime('2049-12-31')
+    reissue_end_date = pd.to_datetime('2050-12-31')
     ## Calculate interest rate from term
     term_days = row['term_days']
     term_years = term_days / 365
-    interest_rate = interest_rates_dict.get(find_closest_value(term_years, list(interest_rates_dict.keys())))
+    closest_term_years_index = find_closest_value_index(term_years, list(interest_rates_dict.keys()))
+    closest_term_years = list(interest_rates_dict.keys())[closest_term_years_index]
+    interest_rate = interest_rates_dict.get(closest_term_years)
     ## Other loop variables
     security_class_1_description = row['Security Class 1 Description']
     security_class_2_description = row['Security Class 2 Description']
@@ -311,40 +313,20 @@ def main():
         30: 5
     }
     # Apply reissue function here (will return Series of Dataframes)
-    #test_df = df[df['Security Class 1 Description'] == 'Bills Maturity Value'].reset_index()
-    #test_df = df[df['Security Class 2 Description'] == '912796MH9']
-    #print(f"Number of securities in test data before reissuing: {len(test_df)}")
     # Reset index
     print(f"DF length: {len(df)}")
     reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
     print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
     #df.reset_index(inplace=True, drop=True)
     print("Simulating reissuance...")
-    # TODO: can't figure out why .apply was taking so long; use for loop
-    # and then try .apply again.
     start_time = time.time()
     reissue_list = reissue_df.apply(
         func=reissue_security,
         axis=1,
         args=(interest_rates_dict, max_record_date)).tolist()
     end_time = time.time()
-    """
-    start_time = time.time()
-    cum_rows = 0
-    df_list = []
-    for i,row in df.iterrows():
-        x = reissue_security(row, interest_rates_dict, max_record_date)
-        if x is not None:
-            cum_rows += len(x)
-            df_list.append(x)
-        if (i+1)%500 == 0:
-            print(f"{i+1} records processed. Cumulative new rows: {cum_rows}")
-        #time.sleep(1)
-    end_time = time.time()
-    """
     print(f"Simulating reissuance took {round((end_time - start_time), 1)} seconds.")
     print("Complete. Concatenating results...")
-    #test_reissue_result = pd.concat(test_reissue.tolist(), axis=0, ignore_index=True)
     reissue_result = pd.concat(reissue_list, axis=0, ignore_index=True)
     print("Complete.")
     print(f"Number of reissued securities in data: {len(reissue_result)}")
@@ -352,7 +334,7 @@ def main():
     print(f"Memory usage: {total_memory_gb}")
     reissue_result.to_csv('reissue_result.csv')
 
-    # TODO: Concat the new dataframes with the original one.
+    # Concat the new dataframes with the original one.
     df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
     print(f"Number of rows after combining: {len(df)}")
     df.to_csv('concat_after_reissue.csv')

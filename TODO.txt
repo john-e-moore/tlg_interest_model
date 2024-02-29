@@ -1,4 +1,9 @@
-* Reissue maybe buggy? Numbers start decreasing after 2023.
+* Bugs
+ * Securities that get added onto are not correctly summing for years before they
+   get reissued.
+ * Yearly payments starts to flatten out, but I think this makes sense because
+   the jump is due to jump in interest rate. Why doesn't Chris' flatten out?
+   I must have a faulty assumption programmed in?
 * Change to fiscal year instead of calendar year.
 * Split code into modules (utils, simulate_reissuance, calculate_interest_payments)
 * Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.
