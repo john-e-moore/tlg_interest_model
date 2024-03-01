@@ -131,7 +131,7 @@ def find_closest_value_index(number: float, values: list) -> int:
     diffs = list(map(lambda x: abs(x - number), values))
     return diffs.index(min(diffs))
 
-def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
+def reissue_security(row, interest_rates_dict) -> pd.DataFrame:
     """
     All securities issued before max_record_date are already in the data,
     so we start reissuing one day later.
@@ -139,10 +139,6 @@ def reissue_security(row, interest_rates_dict, max_record_date) -> pd.DataFrame:
     Returns DataFrame
     """
     # Initialize variables
-    reissue_start_date = max_record_date + pd.Timedelta(days=1)
-    ## Exit if maturity date is before most recent record (would already be in data)
-    #if reissue_start_date > row['Maturity Date']:
-    #    return None
     reissue_end_date = pd.to_datetime('2050-12-31')
     ## Calculate interest rate from term
     term_days = row['term_days']
@@ -313,17 +309,16 @@ def main():
         30: 5
     }
     # Apply reissue function here (will return Series of Dataframes)
-    # Reset index
+    # Only reissue debt that expires after max record date.
     print(f"DF length: {len(df)}")
     reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
     print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
-    #df.reset_index(inplace=True, drop=True)
     print("Simulating reissuance...")
     start_time = time.time()
     reissue_list = reissue_df.apply(
         func=reissue_security,
         axis=1,
-        args=(interest_rates_dict, max_record_date)).tolist()
+        args=(interest_rates_dict,)).tolist()
     end_time = time.time()
     print(f"Simulating reissuance took {round((end_time - start_time), 1)} seconds.")
     print("Complete. Concatenating results...")
@@ -355,6 +350,7 @@ def main():
     df_yearly = pd.DataFrame(processed_rows.tolist())
     end_time = time.time()
     print(f"Processing rows took {(end_time - start_time) / 60} minutes.")
+    df_yearly.to_csv('df_yearly.csv')
 
     # Reorder year columns.
     year_columns = [col for col in df_yearly.columns if col.isdigit() and 1900 <= int(col) <= 2100]
@@ -379,6 +375,7 @@ def main():
     pivot_table.to_csv('result_by_security_type.csv')
     # Pivot year only, not security type.
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
+    pivot_table['interest_payment'] = pivot_table['interest_payment'].round(2)
     pivot_table.to_csv('result.csv')
 
 
