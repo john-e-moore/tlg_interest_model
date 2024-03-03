@@ -6,7 +6,7 @@ import pandas as pd
 import pyarrow
 from utils import load_config, find_closest_value_index, calculate_fraction_of_year_remaining, calculate_fraction_of_year_elapsed, calculate_fraction_of_year_between_issue_and_maturity
 
-def process_raw_row(row) -> dict: 
+def calculate_interest_payments(row: pd.Series) -> dict: 
     """
     Iterates through the years a security was live and returns a dictionary
     containing the interest payment for each year.
@@ -81,7 +81,10 @@ def process_raw_row(row) -> dict:
     
     return result
 
-def reissue_security(row, interest_rates_dict) -> pd.DataFrame:
+def reissue_security(
+        row: pd.Series, 
+        interest_rates: dict, 
+        reissue_end_date: pd.Timestamp) -> pd.DataFrame:
     """
     All securities issued before max_record_date are already in the data,
     so we start reissuing one day later.
@@ -89,13 +92,12 @@ def reissue_security(row, interest_rates_dict) -> pd.DataFrame:
     Returns DataFrame
     """
     # Initialize variables
-    reissue_end_date = pd.to_datetime('2050-12-31')
     ## Calculate interest rate from term
     term_days = row['term_days']
     term_years = term_days / 365
-    closest_term_years_index = find_closest_value_index(term_years, list(interest_rates_dict.keys()))
-    closest_term_years = list(interest_rates_dict.keys())[closest_term_years_index]
-    interest_rate = interest_rates_dict.get(closest_term_years)
+    closest_term_years_index = find_closest_value_index(term_years, list(interest_rates.keys()))
+    closest_term_years = list(interest_rates.keys())[closest_term_years_index]
+    interest_rate = interest_rates.get(closest_term_years)
     ## Other loop variables
     security_class_1_description = row['Security Class 1 Description']
     security_class_2_description = row['Security Class 2 Description']
@@ -185,23 +187,27 @@ def main():
         'Issued Amount (in Millions)', # Read as non-numeric due to *
         #'Outstanding Amount (in Millions)', # Read as non-numeric due to *
     ]
-    raw_data_path = config['raw_data_path']
+    raw_data_path = config['io']['raw_data_path']
 
     df = pd.read_csv(raw_data_path, usecols=usecols)
     print(df.dtypes)
     print(df.shape)
 
     # Filter data.
-    # Only keep non-TIPS, non-FSN marketable securities.
-    class_1_descriptions_to_keep = (
-        'Notes', 
-        'Bonds', 
-        'Bills Maturity Value',
-        #'Inflation-Protected Securities',
-        #'Floating Rate Notes'
-    )
+    # As of writing, only interested in non-TIPS, non-FSN marketable securities:
+    # Yes: 'Notes', 'Bonds', 'Bills Maturity Value'
+    # No: 'Inflation-Protected Securities', 'Floating Rate Notes'
+    class_1_descriptions_to_keep = config['simulation']['security_types']
+    valid_class_1_descriptions = df['Security Class 1 Description'].unique()
+    # Ensure valid security types were passed
+    invalid_security_passed = any(x not in valid_class_1_descriptions for x in class_1_descriptions_to_keep)
+    print(invalid_security_passed)
+    if invalid_security_passed:
+        raise ValueError("An invalid security type was passed. Ensure all security types are included in raw data.")
+    
+    # TODO: ensure all security types passed are present in raw data
     df = df[df['Security Class 1 Description'].isin(class_1_descriptions_to_keep)]
-    print("Non-marketable securites, TIPS, and FSN's removed.")
+    print(f"Filtered to specified security types: {class_1_descriptions_to_keep}")
     print(df.shape)
     # Drop duplicates.
     # Raw data seems to be append-only, so same security can have multiple rows.
@@ -230,47 +236,24 @@ def main():
     print(f"Max record date: {max_record_date}")
     df.drop('Record Date', axis=1, inplace=True)
 
-    # Security term in days
+    # Safety: ensures the reissue function doesn't run forever due to error in raw data.
     df['term_days'] = (df['Maturity Date'] - df['Issue Date']).dt.days
-    # This line ensures the reissue function doesn't run forever
     df = df[df['term_days'] > 0]
     print("Negative term records removed.")
     print(df.shape)
-
-    # Count how many bonds/bills/notes
-    value_counts = df['Security Class 1 Description'].value_counts()
-    print("Value counts:")
-    print(value_counts)
-    # Average bill term in days
-    for description in class_1_descriptions_to_keep:
-        term_avg = df['term_days'][df['Security Class 1 Description'] == description].mean()
-        print(f"Average {description} term: {int(term_avg)} days")
-
-    # TODO: store interest_rates_dict in config
-    # term: rate
-    interest_rates_dict = {
-        1: 5, # 1 year or less
-        2: 5,
-        3: 5,
-        5: 5,
-        7: 5,
-        10: 5,
-        20: 5,
-        30: 5
-    }
-    # Apply reissue function here (will return Series of Dataframes)
+    
     # Only reissue debt that expires after max record date.
-    print(f"DF length: {len(df)}")
     reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
     print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
     print("Simulating reissuance...")
-    start_time = time.time()
+    ## Parameters
+    interest_rates = config['simulation']['interest_rates_flat']
+    reissue_end_date = pd.to_datetime(config['simulation']['reissue_end_date'])
+    ## Apply function
     reissue_list = reissue_df.apply(
         func=reissue_security,
         axis=1,
-        args=(interest_rates_dict,)).tolist()
-    end_time = time.time()
-    print(f"Simulating reissuance took {round((end_time - start_time), 1)} seconds.")
+        args=(interest_rates, reissue_end_date,)).tolist()
     print("Complete. Concatenating results...")
     reissue_result = pd.concat(reissue_list, axis=0, ignore_index=True)
     print("Complete.")
@@ -296,7 +279,7 @@ def main():
     # the resulting Series into a DataFrame with columns added for
     # each year's interest payments.
     start_time = time.time()
-    processed_rows = df.apply(process_raw_row, axis=1)
+    processed_rows = df.apply(calculate_interest_payments, axis=1)
     df_yearly = pd.DataFrame(processed_rows.tolist())
     end_time = time.time()
     print(f"Processing rows took {(end_time - start_time) / 60} minutes.")

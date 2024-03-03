@@ -1,0 +1,20 @@
+io:
+  raw_data_path: raw_data_path.csv
+  output_path: output_path.csv
+simulation:
+  reissue_end_date: 2050-12-31
+  interest_rates_flat:
+    1: 5
+    2: 5
+    3: 5
+    5: 5
+    7: 5
+    10: 5
+    20: 5
+    30: 5
+  interest_rates_varying:
+    1: 4.99
+    2: 4.60
+    5: 4.20
+    10: 4.22
+    30: 4.35
