@@ -3,3 +3,4 @@ venv/
 pat.txt
 config.yml
 *.csv
+*__pycache__*
