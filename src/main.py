@@ -1,31 +1,17 @@
 import os
-import sys
-import time
+import json
 import pandas as pd
 import pyarrow
+import argparse
+from typing import Dict
 from utils import load_config
 from simulation import calculate_interest_payments, reissue_security
 
-def main():
-    """
-    Author: John Moore (2024-03-04)
-
-    Objective: Calculate US Gov't debt burden thru 2050.
-
-    Assumptions:
-    * All debts get reissued immediately when they mature.
-
-    Simulation config parameters:
-    * Interest rates when debt gets created or reissued.
-    * Which security types get included in the simulation
-      (currently 'Notes', 'Bonds', 'Bills Maturity Value')
-    """
-    
-    # Load config.
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(current_dir, 'config.yml')
-    config = load_config(config_path)
-
+def main(
+        config: dict,
+        issue_new_debt: bool, 
+        use_fiscal_calendar: bool, 
+        interest_rates: Dict[int, float]) -> None:
     # Read the .csv containing securities data.
     usecols = [
         'Record Date',
@@ -40,7 +26,6 @@ def main():
         #'Outstanding Amount (in Millions)', # Read as non-numeric due to *
     ]
     raw_data_path = config['io']['raw_data_path']
-
     df = pd.read_csv(raw_data_path, usecols=usecols)
     print(df.dtypes)
     print(f"Shape: {df.shape}")
@@ -105,7 +90,7 @@ def main():
     print(f"Shape: {df.shape}")
     
     ################################################################################
-    # Simulate debt creation and reissuance.
+    # Simulate reissuance of debts.
     ################################################################################
 
     # Only reissue debt that expires after max record date. 
@@ -114,7 +99,6 @@ def main():
     print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
     print("Simulating reissuance...")
     ## Parameters
-    interest_rates = config['simulation']['interest_rates_flat']
     reissue_end_date = pd.to_datetime(config['simulation']['reissue_end_date'])
     ## Apply function
     reissue_list = reissue_df.apply(
@@ -129,6 +113,14 @@ def main():
     # Concatenate the new dataframes with the original one.
     df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
     print(f"Number of rows after combining: {len(df)}")
+
+    ################################################################################
+    # Simulate new debts.
+    ################################################################################
+
+    gdp_millions = config['simulation']['gdp_millions']
+    gdp_growth_rate = config['simulation']['gdp_growth_rate']
+    new_debt_pct_gdp = config['simulation']['new_debt_pct_gdp']
 
     ################################################################################
     # Calculate yearly interest payments.
@@ -168,4 +160,38 @@ def main():
     pivot_table.to_csv(output_path)
 
 if __name__ == "__main__":
-    main()
+    """
+    Author: John Moore (2024-03-04)
+
+    Objective: Calculate US Gov't debt burden thru 2050.
+
+    Assumptions:
+    * All debts get reissued immediately when they mature.
+
+    Simulation config parameters:
+    * Interest rates when debt gets created or reissued.
+    * Which security types get included in the simulation
+      (currently 'Notes', 'Bonds', 'Bills Maturity Value')
+    """
+    # Load config.
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(current_dir, 'config.yml')
+    config = load_config(config_path)
+
+    # Default interest rate
+    interest_rates_default = config['simulation']['interest_rates_default']
+
+    # Initialize argument parser and add arguments
+    parser = argparse.ArgumentParser(description='Process the arguments for debt management.')
+    parser.add_argument('--issue-new-debt', action='store_true', help='Flag to issue new debt (default: false)')
+    parser.add_argument('--use-fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
+    parser.add_argument('--interest-rates', type=json.loads, default=interest_rates_default,
+                        help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities)')
+
+    # Parsing arguments
+    args = parser.parse_args()
+
+    # Convert interest rates keys from str to int if necessary
+    interest_rates_converted = {int(k): v for k, v in args.interest_rates.items()}
+
+    main(config, args.issue_new_debt, args.use_fiscal_calendar, interest_rates_converted)

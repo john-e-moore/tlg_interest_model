@@ -1,5 +1,6 @@
 import yaml
 import pandas as pd
+from typing import List, Union
 
 def load_config(config_path: str) -> dict:
     """Load config from yml file."""
@@ -10,7 +11,7 @@ def load_config(config_path: str) -> dict:
 #
 ################################################################################
     
-def find_closest_value_index(number: float, values: list) -> int:
+def find_closest_value_index(number: float, values: List[Union[int, float]]) -> int:
     """
     Used to find interest rate value from dictionary. Takes
     the term in years of the security, then matches it to the index of 
@@ -51,7 +52,9 @@ def calculate_fraction_of_year_elapsed(_month: int, _day: int) -> float:
 #
 ################################################################################
 
-def calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date) -> float:
+def calculate_fraction_of_year_between_issue_and_maturity(
+        issue_date: pd.Timestamp, 
+        maturity_date: pd.Timestamp) -> float:
     """
     Use when Issue Date and Maturity Date are in the same calendar year.
 
