@@ -5,7 +5,7 @@ import pyarrow
 import argparse
 from typing import Dict
 from utils import load_config
-from simulation import calculate_interest_payments, reissue_security
+from simulation import calculate_interest_payments, reissue_security, issue_new_debt
 
 def main(
         config: dict,
@@ -33,6 +33,8 @@ def main(
     ################################################################################
     # Preprocessing.
     ################################################################################
+
+    # TODO: add fiscal calendar capability
 
     """
     Security types: As of writing, only interested in non-TIPS, non-FSN marketable securities.
@@ -115,14 +117,6 @@ def main(
     print(f"Number of rows after combining: {len(df)}")
 
     ################################################################################
-    # Simulate new debts.
-    ################################################################################
-
-    gdp_millions = config['simulation']['gdp_millions']
-    gdp_growth_rate = config['simulation']['gdp_growth_rate']
-    new_debt_pct_gdp = config['simulation']['new_debt_pct_gdp']
-
-    ################################################################################
     # Calculate yearly interest payments.
     ################################################################################
 
@@ -147,6 +141,34 @@ def main(
     # Sum yearly interest payments by id and security type.
     df_yearly_sorted.drop(['issue_date', 'maturity_date'], axis=1, inplace=True)
     id_grouped_df = df_yearly_sorted.groupby(['id', 'security_type'], as_index=False).sum()
+
+    # Simulate new debt if argument was passed.
+    if issue_new_debt:
+        gdp_millions = config['simulation']['gdp_millions']
+        gdp_growth_rate = config['simulation']['gdp_growth_rate']
+        new_debt_pct_gdp = config['simulation']['new_debt_pct_gdp']
+        new_debt_interest_rate = config['simulation']['new_debt_interest_rate']
+        print(f"Issuing new debt with parameters:")
+        print(f"GDP in millions: {gdp_millions}")
+        print(f"GDP growth rate: {gdp_growth_rate}")
+        print(f"Yearly debt to issue as a percentage of GDP: {new_debt_pct_gdp}")
+        print(f"Interest rate for new debt: {new_debt_interest_rate}")
+        new_debts_df = issue_new_debt(
+            gdp_millions=gdp_millions, 
+            gdp_growth_rate=gdp_growth_rate, 
+            new_debt_pct_gdp=new_debt_pct_gdp, 
+            interest_rate=new_debt_interest_rate,
+            start_date=max_record_date, 
+            end_date=reissue_end_date
+        )
+        # Add new debts to id_grouped_df
+        id_grouped_df = pd.concat([id_grouped_df, new_debts_df], axis=0, ignore_index=True)
+
+    ################################################################################
+    # Simulate new debts.
+    ################################################################################
+
+    
 
     # Melt and pivot sum of interest payments on year.
     # NOTE: if desired, you can group by both security type and year.

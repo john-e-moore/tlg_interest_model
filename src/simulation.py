@@ -2,12 +2,29 @@ import numpy as np
 import pandas as pd
 from utils import find_closest_value_index, calculate_fraction_of_year_remaining, calculate_fraction_of_year_elapsed, calculate_fraction_of_year_between_issue_and_maturity
 
-def create_new_debt():
+def issue_new_debt(
+    gdp_millions: int,
+    gdp_growth_rate: float,
+    new_debt_pct_gdp: float,
+    interest_rate: float,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp
+) -> pd.DataFrame:
     """
     We make an assumption for the US budget deficit (% over GDP that gets spent).
     
     To include this new debt in the simulation, we can add a row to the data with
     an issue amount equal to the deficit in each year.
+
+    Note: percentages are passed as percents and need to be divided by 100 for calculations.
+
+    Params:
+    gdp_millions: US GDP in millions of dollars.
+    gdp_growth_rate: The yearly rate of GDP growth to use.
+    new_debt_pct_gdp: The amount of new debt every year as a percentage of GDP.
+    interest_rate: The yearly interest rate to be paid on new debt.
+    start_date: Start date.
+    end_date: End date.
     """
     pass
 

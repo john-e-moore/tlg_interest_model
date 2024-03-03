@@ -1,4 +1,4 @@
-* Option to issue new debt of 6.3% of GDP on 26.835T. Assume GDP grows 6% annually.
-* Allow user to pass interest rates, yes/no fiscal year, and yes/no for new debt when running the program.
-* Change to fiscal year instead of calendar year.
+* Add new debt capability.
+* Add fiscal year capability.
+* README
 * Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.
