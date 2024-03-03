@@ -2,6 +2,7 @@ import yaml
 import pandas as pd
 
 def load_config(config_path: str) -> dict:
+    """Load config from yml file."""
     with open(config_path, 'r') as file:
         return yaml.safe_load(file)
 
