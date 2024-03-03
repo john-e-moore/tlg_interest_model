@@ -11,6 +11,10 @@ def create_new_debt():
     """
     pass
 
+################################################################################
+#
+################################################################################
+
 def reissue_security(
         row: pd.Series, 
         interest_rates: dict, 
@@ -61,6 +65,10 @@ def reissue_security(
         current_issue_date += pd.Timedelta(days=term_days)
     
     return df
+
+################################################################################
+#
+################################################################################
 
 def calculate_interest_payments(row: pd.Series) -> dict: 
     """
