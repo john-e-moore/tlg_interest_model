@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import pandas as pd
 import pyarrow
@@ -9,9 +10,10 @@ from simulation import calculate_interest_payments, reissue_security, issue_new_
 
 def main(
         config: dict,
-        issue_new_debt: bool, 
-        use_fiscal_calendar: bool, 
-        interest_rates: Dict[int, float]) -> None:
+        new_debt: bool, 
+        fiscal_calendar: bool, 
+        interest_rates: Dict[int, float]
+) -> None:
     # Read the .csv containing securities data.
     usecols = [
         'Record Date',
@@ -143,7 +145,7 @@ def main(
     id_grouped_df = df_yearly_sorted.groupby(['id', 'security_type'], as_index=False).sum()
 
     # Simulate new debt if argument was passed.
-    if issue_new_debt:
+    if new_debt:
         gdp_millions = config['simulation']['gdp_millions']
         gdp_growth_rate = config['simulation']['gdp_growth_rate']
         new_debt_pct_gdp = config['simulation']['new_debt_pct_gdp']
@@ -153,7 +155,7 @@ def main(
         print(f"GDP growth rate: {gdp_growth_rate}")
         print(f"Yearly debt to issue as a percentage of GDP: {new_debt_pct_gdp}")
         print(f"Interest rate for new debt: {new_debt_interest_rate}")
-        new_debts_df = issue_new_debt(
+        new_debt_payments = issue_new_debt(
             gdp_millions=gdp_millions, 
             gdp_growth_rate=gdp_growth_rate, 
             new_debt_pct_gdp=new_debt_pct_gdp, 
@@ -161,14 +163,15 @@ def main(
             start_date=max_record_date, 
             end_date=reissue_end_date
         )
+        print(f"New debt payments: {new_debt_payments}")
         # Add new debts to id_grouped_df
-        id_grouped_df = pd.concat([id_grouped_df, new_debts_df], axis=0, ignore_index=True)
-
-    ################################################################################
-    # Simulate new debts.
-    ################################################################################
-
-    
+        new_row = {col: new_debt_payments.get(col, 0) for col in id_grouped_df.columns}
+        new_row['id'] = 'Simulated new debt'
+        new_row['security_type'] = 'All'
+        id_grouped_df.loc[len(id_grouped_df)] = new_row
+        print("Tail:")
+        print(id_grouped_df[['id', 'security_type', '2024', '2025', '2026']].tail())
+        id_grouped_df.to_csv('id_grouped.csv')
 
     # Melt and pivot sum of interest payments on year.
     # NOTE: if desired, you can group by both security type and year.
@@ -200,20 +203,18 @@ if __name__ == "__main__":
     config_path = os.path.join(current_dir, 'config.yml')
     config = load_config(config_path)
 
-    # Default interest rate
     interest_rates_default = config['simulation']['interest_rates_default']
 
-    # Initialize argument parser and add arguments
+    # Initialize argument parser and add arguments.
     parser = argparse.ArgumentParser(description='Process the arguments for debt management.')
-    parser.add_argument('--issue-new-debt', action='store_true', help='Flag to issue new debt (default: false)')
-    parser.add_argument('--use-fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
+    parser.add_argument('--new-debt', action='store_true', help='Flag to issue new debt (default: false)')
+    parser.add_argument('--fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
     parser.add_argument('--interest-rates', type=json.loads, default=interest_rates_default,
                         help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities)')
 
-    # Parsing arguments
     args = parser.parse_args()
 
-    # Convert interest rates keys from str to int if necessary
+    # Convert interest rates keys from str to int.
     interest_rates_converted = {int(k): v for k, v in args.interest_rates.items()}
 
-    main(config, args.issue_new_debt, args.use_fiscal_calendar, interest_rates_converted)
+    main(config, args.new_debt, args.fiscal_calendar, interest_rates_converted)

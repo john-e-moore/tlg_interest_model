@@ -9,13 +9,8 @@ def issue_new_debt(
     interest_rate: float,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp
-) -> pd.DataFrame:
+) -> dict:
     """
-    We make an assumption for the US budget deficit (% over GDP that gets spent).
-    
-    To include this new debt in the simulation, we can add a row to the data with
-    an issue amount equal to the deficit in each year.
-
     Note: percentages are passed as percents and need to be divided by 100 for calculations.
 
     Params:
@@ -25,8 +20,35 @@ def issue_new_debt(
     interest_rate: The yearly interest rate to be paid on new debt.
     start_date: Start date.
     end_date: End date.
+
+    Returns:
+    Dictionary in the form {year: interest_payment} where year an integer
+    and interest_payment is the interest paid that year.
     """
-    pass
+    interest_payments = {}
+    start_year = start_date.year
+    end_year = end_date.year
+    current_gdp = gdp_millions
+
+    for year in range(start_year, end_year + 1):
+        new_debt = (current_gdp * new_debt_pct_gdp) / 100
+        interest_payment = (new_debt * interest_rate) / 100
+
+        # Portion start year and end year payments
+        if year == start_year:
+            interest_payment *= calculate_fraction_of_year_remaining(
+                start_date.month, start_date.day
+            )
+        elif year == end_year:
+            interest_payment *= calculate_fraction_of_year_elapsed(
+                end_date.month, end_date.day
+            )
+
+        interest_payments[str(year)] = interest_payment
+
+        current_gdp *= (1 + (gdp_growth_rate / 100))
+
+    return interest_payments
 
 ################################################################################
 #
