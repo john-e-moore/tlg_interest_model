@@ -11,7 +11,10 @@ def issue_new_debt(
     end_date: pd.Timestamp
 ) -> dict:
     """
-    Note: percentages are passed as percents and need to be divided by 100 for calculations.
+    Note: Percentages are passed as percents and need to be divided by 100 for calculations.
+    
+    Note: The interest payments are added cumulatively year by year; new debt issued
+    each year stays on the books. 
 
     Params:
     gdp_millions: US GDP in millions of dollars.
@@ -30,11 +33,12 @@ def issue_new_debt(
     end_year = end_date.year
     current_gdp = gdp_millions
 
+    cumulative_debt = 0
     for year in range(start_year, end_year + 1):
         new_debt = (current_gdp * new_debt_pct_gdp) / 100
         interest_payment = (new_debt * interest_rate) / 100
 
-        # Portion start year and end year payments
+        # Prorate start year and end year payments
         if year == start_year:
             interest_payment *= calculate_fraction_of_year_remaining(
                 start_date.month, start_date.day
@@ -44,9 +48,10 @@ def issue_new_debt(
                 end_date.month, end_date.day
             )
 
-        interest_payments[str(year)] = interest_payment
+        interest_payments[str(year)] = interest_payment + cumulative_debt
 
         current_gdp *= (1 + (gdp_growth_rate / 100))
+        cumulative_debt += interest_payment
 
     return interest_payments
 

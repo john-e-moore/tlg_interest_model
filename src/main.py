@@ -166,7 +166,7 @@ def main(
         print(f"New debt payments: {new_debt_payments}")
         # Add new debts to id_grouped_df
         new_row = {col: new_debt_payments.get(col, 0) for col in id_grouped_df.columns}
-        new_row['id'] = 'Simulated new debt'
+        new_row['id'] = 'Simulated new debt payments'
         new_row['security_type'] = 'All'
         id_grouped_df.loc[len(id_grouped_df)] = new_row
         print("Tail:")
@@ -175,6 +175,8 @@ def main(
 
     # Melt and pivot sum of interest payments on year.
     # NOTE: if desired, you can group by both security type and year.
+    print("Tail:")
+    print(id_grouped_df[['id', 'security_type', '2024', '2025', '2026']].tail())
     id_grouped_df.drop('id', axis=1, inplace=True)
     df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
