@@ -18,3 +18,7 @@ simulation:
     5: 4.20
     10: 4.22
     30: 4.35
+  gdp_millions: 26835000
+  gdp_growth_rate: 6.0
+  new_debt_pct_gdp: 6.3
+  new_debt_interest_rate: 5.0
