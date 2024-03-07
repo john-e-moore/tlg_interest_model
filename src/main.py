@@ -9,10 +9,17 @@ from utils import load_config
 from simulation import calculate_interest_payments, reissue_security, issue_new_debt
 
 def main(
-        config: dict,
+        raw_data_path: str,
+        output_path: str,
+        reissue_end_date: pd.Timestamp,
         new_debt: bool, 
+        security_types: list,
         fiscal_calendar: bool, 
-        interest_rates: Dict[int, float]
+        interest_rates: Dict[int, float],
+        gdp_millions: int,
+        gdp_growth_rate: float,
+        new_debt_pct_gdp: float,
+        new_debt_interest_rate: float
 ) -> None:
     # Read the .csv containing securities data.
     usecols = [
@@ -27,7 +34,6 @@ def main(
         'Issued Amount (in Millions)', # Read as non-numeric due to *
         #'Outstanding Amount (in Millions)', # Read as non-numeric due to *
     ]
-    raw_data_path = config['io']['raw_data_path']
     df = pd.read_csv(raw_data_path, usecols=usecols)
     print(df.dtypes)
     print(f"Shape: {df.shape}")
@@ -45,7 +51,7 @@ def main(
     No: 'Inflation-Protected Securities', 'Floating Rate Notes'
     """
     # Ensure valid security types were passed
-    class_1_descriptions_to_keep = config['simulation']['security_types']
+    class_1_descriptions_to_keep = security_types
     valid_class_1_descriptions = df['Security Class 1 Description'].unique()
     invalid_security_passed = any(x not in valid_class_1_descriptions for x in class_1_descriptions_to_keep)
     if invalid_security_passed:
@@ -102,8 +108,6 @@ def main(
     reissue_df = df[df['Maturity Date'] >= max_record_date].reset_index(drop=True)
     print(f"Number of securities in original data to be reissued: {len(reissue_df)}")
     print("Simulating reissuance...")
-    ## Parameters
-    reissue_end_date = pd.to_datetime(config['simulation']['reissue_end_date'])
     ## Apply function
     reissue_list = reissue_df.apply(
         func=reissue_security,
@@ -146,10 +150,6 @@ def main(
 
     # Simulate new debt if argument was passed.
     if new_debt:
-        gdp_millions = config['simulation']['gdp_millions']
-        gdp_growth_rate = config['simulation']['gdp_growth_rate']
-        new_debt_pct_gdp = config['simulation']['new_debt_pct_gdp']
-        new_debt_interest_rate = config['simulation']['new_debt_interest_rate']
         print(f"Issuing new debt with parameters:")
         print(f"GDP in millions: {gdp_millions}")
         print(f"GDP growth rate: {gdp_growth_rate}")
@@ -183,7 +183,6 @@ def main(
     pivot_table['interest_payment'] = pivot_table['interest_payment'].round(2)
 
     # Save output
-    output_path = config['io']['output_path']
     pivot_table.to_csv(output_path)
 
 if __name__ == "__main__":
@@ -205,18 +204,36 @@ if __name__ == "__main__":
     config_path = os.path.join(current_dir, 'config.yml')
     config = load_config(config_path)
 
-    interest_rates_default = config['simulation']['interest_rates_default']
-
     # Initialize argument parser and add arguments.
     parser = argparse.ArgumentParser(description='Process the arguments for debt management.')
     parser.add_argument('--new-debt', action='store_true', help='Flag to issue new debt (default: false)')
     parser.add_argument('--fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
-    parser.add_argument('--interest-rates', type=json.loads, default=interest_rates_default,
-                        help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities)')
+    parser.add_argument('--interest-rates', type=json.loads, default=config['simulation']['interest_rates_default'],
+                        help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities).')
+    parser.add_argument('--gdp-millions', type=int, default=config['simulation']['gdp_millions'],
+                        help='Current US GDP in millions of dollars.')
+    parser.add_argument('--gdp-growth-rate', type=float, default=config['simulation']['gdp_growth_rate'],
+                        help='Estimated GDP growth rate.')
+    parser.add_argument('--new-debt-pct-gdp', type=float, default=config['simulation']['new_debt_pct_gdp'],
+                        help='Estimated budget deficit.')
+    parser.add_argument('--new-debt-interest-rate', type=float, default=config['simulation']['new_debt_interest_rate'],
+                        help='Estimated average Fed Funds rate.')
 
     args = parser.parse_args()
 
     # Convert interest rates keys from str to int.
     interest_rates_converted = {int(k): v for k, v in args.interest_rates.items()}
 
-    main(config, args.new_debt, args.fiscal_calendar, interest_rates_converted)
+    main(
+        raw_data_path=config['io']['raw_data_path'],
+        output_path=config['io']['output_path'],
+        reissue_end_date=pd.to_datetime(config['simulation']['reissue_end_date']),
+        new_debt=args.new_debt, 
+        security_types=config['simulation']['security_types'],
+        fiscal_calendar=args.fiscal_calendar, 
+        interest_rates=interest_rates_converted,
+        gdp_millions=args.gdp_millions,
+        gdp_growth_rate=args.gdp_growth_rate,
+        new_debt_pct_gdp=args.new_debt_pct_gdp,
+        new_debt_interest_rate=args.new_debt_interest_rate
+    )
