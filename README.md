@@ -2,6 +2,8 @@
 ## Overview
 The purpose of this project is to simulate the US Government's public debt burden in years to come given a set of assumptions. It accounts for debts maturing and being reissued at different interest rates.
 
+![Excel chart made with output](/images/output_chart.png "Excel chart made with output")
+
 ## Getting Started
 ### Prerequisites
 A Python installation, and a .csv download of the [U.S. Treasury's Monthly Statement of the Public Debt](https://fiscaldata.treasury.gov/datasets/monthly-statement-public-debt/summary-of-treasury-securities-outstanding).
