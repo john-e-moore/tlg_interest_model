@@ -2,6 +2,8 @@
 ## Overview
 The purpose of this project is to simulate the US Government's public debt burden in years to come given a set of assumptions. It accounts for debts maturing and being reissued at different interest rates.
 
+Important note: From 2012 forward, the simple securities Bills, Notes, and Bonds make up about 84% of public debt volume. Therefore, for more accurate total public debt estimates, you can apply a multiplier of 1.19 to the yearly output numbers. Using that multiplier resulted in an almost perfect match with future projections released by the White House in March 2024 (using their GDP, deficit, and interest rate numbers).
+
 ![Excel chart made with output](/images/output_chart.png "Excel chart made with output")
 
 ## Getting Started
