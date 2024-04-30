@@ -6,7 +6,7 @@ import pyarrow
 import argparse
 from typing import Dict
 from utils import load_config
-from simulation import calculate_interest_payments, reissue_security, issue_new_debt
+from simulation import calculate_interest_payments, reissue_security, issue_new_debt, compute_future_gdps
 
 def main(
         raw_data_path: str,
@@ -19,7 +19,8 @@ def main(
         gdp_millions: int,
         gdp_growth_rate: float,
         new_debt_pct_gdp: float,
-        new_debt_interest_rate: float
+        new_debt_interest_rate: float,
+        multiplier: float
 ) -> None:
     # Read the .csv containing securities data.
     usecols = [
@@ -173,6 +174,22 @@ def main(
         print(id_grouped_df[['id', 'security_type', '2024', '2025', '2026']].tail())
         id_grouped_df.to_csv('id_grouped.csv')
 
+    # Load past GDPs
+    # Compute end of year GDPs by year
+    future_gdps = compute_future_gdps(
+        gdp_millions=gdp_millions, 
+        gdp_growth_rate=gdp_growth_rate, 
+        start_date=max_record_date, 
+        end_date=reissue_end_date
+    )
+    print(future_gdps)
+    future_gdps_df = pd.DataFrame.from_dict(
+        future_gdps.items(), 
+        columns=['year', 'gdp'])
+    print(future_gdps_df.head())
+    print(f"Future gdp dtypes:\n{future_gdps_df.dtypes}")
+    future_gdps_df.to_csv('future_gdps.csv')
+
     # Melt and pivot sum of interest payments on year.
     # NOTE: if desired, you can group by both security type and year.
     print("Tail:")
@@ -180,7 +197,17 @@ def main(
     id_grouped_df.drop('id', axis=1, inplace=True)
     df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
+    pivot_table['interest_payment'] = pivot_table['interest_payment'] * multiplier
     pivot_table['interest_payment'] = pivot_table['interest_payment'].round(2)
+    pivot_table.to_csv('pivot_table_initial.csv')
+    # Apply multiplier
+    # NOTE: this accounts for Bills, Bonds, and Notes only making up
+    # about 84% of the public debt. Functionality for TIPS etc. not implemented
+    # yet.
+    # Join w/ GDP numbers
+    pivot_table = pivot_table.join(future_gdps)
+    print(pivot_table.head())
+    print(f"Pivot table dtypes:\n{pivot_table.dtypes}")
 
     # Save output
     pivot_table.to_csv(output_path)
@@ -235,5 +262,6 @@ if __name__ == "__main__":
         gdp_millions=args.gdp_millions,
         gdp_growth_rate=args.gdp_growth_rate,
         new_debt_pct_gdp=args.new_debt_pct_gdp,
-        new_debt_interest_rate=args.new_debt_interest_rate
+        new_debt_interest_rate=args.new_debt_interest_rate,
+        multiplier=config['simulation']['multiplier']
     )
