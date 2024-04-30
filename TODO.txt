@@ -1,3 +1,4 @@
+* Allow different interest rates yearly
 * Output plots in addition to .csv. For instance double y-axis with interest expense and GDP.
 * Add fiscal year capability.
 * Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.

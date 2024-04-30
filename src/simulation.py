@@ -2,6 +2,23 @@ import numpy as np
 import pandas as pd
 from utils import find_closest_value_index, calculate_fraction_of_year_remaining, calculate_fraction_of_year_elapsed, calculate_fraction_of_year_between_issue_and_maturity
 
+def compute_future_gdps(
+    gdp_millions: int,
+    gdp_growth_rate: float,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp
+) -> dict:
+    gdps = {}
+    start_year = start_date.year
+    end_year = end_date.year
+    current_gdp = gdp_millions
+
+    for year in range(start_year, end_year + 1):
+        gdps[str(year)] = current_gdp
+        current_gdp *= (1 + (gdp_growth_rate / 100))
+    
+    return gdps
+
 def issue_new_debt(
     gdp_millions: int,
     gdp_growth_rate: float,

@@ -10,6 +10,7 @@ from simulation import calculate_interest_payments, reissue_security, issue_new_
 
 def main(
         raw_data_path: str,
+        historical_gdps_path: str,
         output_path: str,
         reissue_end_date: pd.Timestamp,
         new_debt: bool, 
@@ -174,7 +175,10 @@ def main(
         print(id_grouped_df[['id', 'security_type', '2024', '2025', '2026']].tail())
         id_grouped_df.to_csv('id_grouped.csv')
 
-    # Load past GDPs
+    # Load historical GDPs
+    historical_gdps = pd.read_csv(historical_gdps_path, index_col='year')
+    historical_gdps.index = historical_gdps.index.astype(str)
+    print(f"Historical gpds:\n{historical_gdps.head()}")
     # Compute end of year GDPs by year
     future_gdps = compute_future_gdps(
         gdp_millions=gdp_millions, 
@@ -182,13 +186,14 @@ def main(
         start_date=max_record_date, 
         end_date=reissue_end_date
     )
-    print(future_gdps)
     future_gdps_df = pd.DataFrame.from_dict(
-        future_gdps.items(), 
-        columns=['year', 'gdp'])
-    print(future_gdps_df.head())
-    print(f"Future gdp dtypes:\n{future_gdps_df.dtypes}")
-    future_gdps_df.to_csv('future_gdps.csv')
+        future_gdps, 
+        orient='index',
+        columns=['gdp_millions_end_of_year'])
+    future_gdps_df.index = future_gdps_df.index.astype(str)
+    gdps_df = pd.concat([historical_gdps, future_gdps_df], axis=0)
+    gdps_df['gdp_millions_end_of_year'] = gdps_df['gdp_millions_end_of_year'].astype(int)
+    gdps_df.to_csv('gdps.csv')
 
     # Melt and pivot sum of interest payments on year.
     # NOTE: if desired, you can group by both security type and year.
@@ -197,15 +202,16 @@ def main(
     id_grouped_df.drop('id', axis=1, inplace=True)
     df_melted = id_grouped_df.melt(id_vars=["security_type"], var_name="year", value_name="interest_payment")
     pivot_table = pd.pivot_table(df_melted, values="interest_payment", index=["year"], aggfunc='sum')
-    pivot_table['interest_payment'] = pivot_table['interest_payment'] * multiplier
-    pivot_table['interest_payment'] = pivot_table['interest_payment'].round(2)
-    pivot_table.to_csv('pivot_table_initial.csv')
     # Apply multiplier
     # NOTE: this accounts for Bills, Bonds, and Notes only making up
     # about 84% of the public debt. Functionality for TIPS etc. not implemented
     # yet.
+    pivot_table['interest_payment'] = pivot_table['interest_payment'] * multiplier
+    pivot_table['interest_payment'] = pivot_table['interest_payment'].round(2)
+    pivot_table.to_csv('pivot_table_initial.csv')
     # Join w/ GDP numbers
-    pivot_table = pivot_table.join(future_gdps)
+    pivot_table = pivot_table.join(gdps_df, how='inner')
+    pivot_table['pct_gdp'] = (pivot_table['interest_payment'] / pivot_table['gdp_millions_end_of_year']).round(5)
     print(pivot_table.head())
     print(f"Pivot table dtypes:\n{pivot_table.dtypes}")
 
@@ -253,6 +259,7 @@ if __name__ == "__main__":
 
     main(
         raw_data_path=config['io']['raw_data_path'],
+        historical_gdps_path=config['io']['historical_gdps_path'],
         output_path=config['io']['output_path'],
         reissue_end_date=pd.to_datetime(config['simulation']['reissue_end_date']),
         new_debt=args.new_debt, 
