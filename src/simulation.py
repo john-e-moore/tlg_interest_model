@@ -52,23 +52,29 @@ def issue_new_debt(
 
     cumulative_debt = 0
     for year in range(start_year, end_year + 1):
+        # Freshly issued debt and associated interest payment
         new_debt = (current_gdp * new_debt_pct_gdp) / 100
-        interest_payment = (new_debt * interest_rate) / 100
+        new_debt_interest_payment = (new_debt * interest_rate) / 100
+
+        # Add interest payment on cumulative debt
+        cumulative_debt_interest_payment = (cumulative_debt * interest_rate) / 100
+        total_interest_payment = new_debt_interest_payment + cumulative_debt_interest_payment
 
         # Prorate start year and end year payments
         if year == start_year:
-            interest_payment *= calculate_fraction_of_year_remaining(
+            total_interest_payment *= calculate_fraction_of_year_remaining(
                 start_date.month, start_date.day
             )
         elif year == end_year:
-            interest_payment *= calculate_fraction_of_year_elapsed(
+            total_interest_payment *= calculate_fraction_of_year_elapsed(
                 end_date.month, end_date.day
             )
 
-        interest_payments[str(year)] = interest_payment + cumulative_debt
+        # Store current year's interest payments
+        interest_payments[str(year)] = total_interest_payment + cumulative_debt
 
         current_gdp *= (1 + (gdp_growth_rate / 100))
-        cumulative_debt += interest_payment
+        cumulative_debt += total_interest_payment
 
     return interest_payments
 
