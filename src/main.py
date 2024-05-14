@@ -17,7 +17,7 @@ def main(
         security_types: list,
         fiscal_calendar: bool, 
         interest_rates: Dict[int, float],
-        gdp_millions: int,
+        current_gdp_millions: int,
         gdp_growth_rate: float,
         new_debt_pct_gdp: float,
         new_debt_interest_rate: float,
@@ -153,12 +153,12 @@ def main(
     # Simulate new debt if argument was passed.
     if new_debt:
         print(f"Issuing new debt with parameters:")
-        print(f"GDP in millions: {gdp_millions}")
+        print(f"GDP in millions: {current_gdp_millions}")
         print(f"GDP growth rate: {gdp_growth_rate}")
         print(f"Yearly debt to issue as a percentage of GDP: {new_debt_pct_gdp}")
         print(f"Interest rate for new debt: {new_debt_interest_rate}")
         new_debt_payments = issue_new_debt(
-            gdp_millions=gdp_millions, 
+            gdp_millions=current_gdp_millions, 
             gdp_growth_rate=gdp_growth_rate, 
             new_debt_pct_gdp=new_debt_pct_gdp, 
             interest_rate=new_debt_interest_rate,
@@ -181,7 +181,7 @@ def main(
     print(f"Historical gpds:\n{historical_gdps.head()}")
     # Compute end of year GDPs by year
     future_gdps = compute_future_gdps(
-        gdp_millions=gdp_millions, 
+        gdp_millions=current_gdp_millions, 
         gdp_growth_rate=gdp_growth_rate, 
         start_date=max_record_date, 
         end_date=reissue_end_date
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument('--fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
     parser.add_argument('--interest-rates', type=json.loads, default=config['simulation']['interest_rates_default'],
                         help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities).')
-    parser.add_argument('--gdp-millions', type=int, default=config['simulation']['gdp_millions'],
+    parser.add_argument('--gdp-millions', type=int, default=config['simulation']['current_gdp_millions'],
                         help='Current US GDP in millions of dollars.')
     parser.add_argument('--gdp-growth-rate', type=float, default=config['simulation']['gdp_growth_rate'],
                         help='Estimated GDP growth rate.')
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         security_types=config['simulation']['security_types'],
         fiscal_calendar=args.fiscal_calendar, 
         interest_rates=interest_rates_converted,
-        gdp_millions=args.gdp_millions,
+        current_gdp_millions=args.current_gdp_millions,
         gdp_growth_rate=args.gdp_growth_rate,
         new_debt_pct_gdp=args.new_debt_pct_gdp,
         new_debt_interest_rate=args.new_debt_interest_rate,
