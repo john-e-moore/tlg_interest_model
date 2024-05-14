@@ -92,6 +92,11 @@ def calculate_laubach_interest_rate(
 
     Returns: theoretical underlying interest rate
     """
+    print(f"Previous debt-to-gdp: {previous_debt_to_gdp}")
+    print(f"Previous interest rate: {previous_interest_rate}")
+    print(f"Current debt-to-gdp: {current_debt_to_gdp}")
     pct_gain_debt_to_gdp = (current_debt_to_gdp - previous_debt_to_gdp)/previous_debt_to_gdp
-    
-    return previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio
+    print(f"Pct gain: {pct_gain_debt_to_gdp}")
+    new_rate = previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio*100
+    print(f"New rate: {new_rate}")
+    return previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio*100
