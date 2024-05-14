@@ -14,12 +14,13 @@ def main(
         output_path: str,
         reissue_end_date: pd.Timestamp,
         new_debt: bool, 
+        laubach_rates: bool,
         security_types: list,
         fiscal_calendar: bool, 
-        interest_rates: Dict[int, float],
+        initial_yields: Dict[int, float],
         current_gdp_millions: int,
         gdp_growth_rate: float,
-        new_debt_pct_gdp: float,
+        primary_deficit_pct_gdp: float,
         new_debt_interest_rate: float,
         multiplier: float
 ) -> None:
@@ -112,7 +113,7 @@ def main(
     reissue_list = reissue_df.apply(
         func=reissue_security,
         axis=1,
-        args=(interest_rates, reissue_end_date,)).tolist()
+        args=(initial_yields, reissue_end_date, laubach_rates,)).tolist()
     print("Complete. Concatenating results...")
     reissue_result = pd.concat(reissue_list, axis=0, ignore_index=True)
     print("Complete.")
@@ -122,7 +123,22 @@ def main(
     df = pd.concat([df, reissue_result], axis=0, ignore_index=True)
     print(f"Number of rows after combining: {len(df)}")
 
+    df.to_csv('reissued_no_rates.csv')
 
+
+    ################################################################################
+    # Main simulation
+    ################################################################################
+    # Initialize debt cumulative total
+    # Initialize interest expense cumulative total
+    # Loop by year
+    # If laubach_rates:
+    #  Calculate debt-to-gdp
+    #  Calculate interest rate
+    #  Fill in interest rate / yield for all securities getting reissued that year
+    # Create new debt equal to primary deficit with current interest rate
+    #  ## issue_new_debt function cannot be used; looping years takes place in main now
+    # Calculate interest expense for current year, then add it to cumulative debt
 
 if __name__ == "__main__":
     """
@@ -146,14 +162,15 @@ if __name__ == "__main__":
     # Initialize argument parser and add arguments.
     parser = argparse.ArgumentParser(description='Process the arguments for debt management.')
     parser.add_argument('--new-debt', action='store_true', help='Flag to issue new debt (default: false)')
+    parser.add_argument('--laubach-rates', action='store_true', help='Flag to calculate interest rates based on debt-to-gdp (default: false)')
     parser.add_argument('--fiscal-calendar', action='store_true', help='Flag to use fiscal calendar (default: false)')
-    parser.add_argument('--interest-rates', type=json.loads, default=config['simulation']['interest_rates_default'],
-                        help='Dictionary of interest rates with term as key and rate as value (default is 5 percent for all securities).')
-    parser.add_argument('--gdp-millions', type=int, default=config['simulation']['current_gdp_millions'],
+    parser.add_argument('--initial-yields', type=json.loads, default=config['simulation']['initial_yields'],
+                        help='Dictionary of yields with term as key and rate as value (default is 5 percent for all securities).')
+    parser.add_argument('--current-gdp-millions', type=int, default=config['simulation']['current_gdp_millions'],
                         help='Current US GDP in millions of dollars.')
     parser.add_argument('--gdp-growth-rate', type=float, default=config['simulation']['gdp_growth_rate'],
                         help='Estimated GDP growth rate.')
-    parser.add_argument('--new-debt-pct-gdp', type=float, default=config['simulation']['new_debt_pct_gdp'],
+    parser.add_argument('--primary-deficit-pct-gdp', type=float, default=config['simulation']['primary_deficit_pct_gdp'],
                         help='Estimated budget deficit.')
     parser.add_argument('--new-debt-interest-rate', type=float, default=config['simulation']['new_debt_interest_rate'],
                         help='Estimated average Fed Funds rate.')
@@ -161,7 +178,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Convert interest rates keys from str to int.
-    interest_rates_converted = {int(k): v for k, v in args.interest_rates.items()}
+    initial_yields_converted = {int(k): v for k, v in args.initial_yields.items()}
 
     main(
         raw_data_path=config['io']['raw_data_path'],
@@ -169,12 +186,13 @@ if __name__ == "__main__":
         output_path=config['io']['output_path'],
         reissue_end_date=pd.to_datetime(config['simulation']['reissue_end_date']),
         new_debt=args.new_debt, 
+        laubach_rates=args.laubach_rates,
         security_types=config['simulation']['security_types'],
         fiscal_calendar=args.fiscal_calendar, 
-        interest_rates=interest_rates_converted,
+        initial_yields=initial_yields_converted,
         current_gdp_millions=args.current_gdp_millions,
         gdp_growth_rate=args.gdp_growth_rate,
-        new_debt_pct_gdp=args.new_debt_pct_gdp,
+        primary_deficit_pct_gdp=args.primary_deficit_pct_gdp,
         new_debt_interest_rate=args.new_debt_interest_rate,
         multiplier=config['simulation']['multiplier']
     )

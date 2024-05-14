@@ -71,3 +71,27 @@ def calculate_fraction_of_year_between_issue_and_maturity(
     total_days_in_year = 365
     
     return days_between / total_days_in_year
+
+################################################################################
+#
+################################################################################
+
+def calculate_laubach_interest_rate(
+        current_debt_to_gdp: float, 
+        previous_debt_to_gdp: float, 
+        previous_interest_rate: float,
+        laubach_ratio: float) -> float:
+    """
+    Calculates theoretical underlying interest rate based on debt-to-gdp.
+
+    Parameters:
+    debt: current debt
+    gdp: current gdp
+    laubach_ratio: marginal gain in theoretical underlying interest rate,
+      in basis points, per point of debt-to-gdp gain 
+
+    Returns: theoretical underlying interest rate
+    """
+    pct_gain_debt_to_gdp = (current_debt_to_gdp - previous_debt_to_gdp)/previous_debt_to_gdp
+    
+    return previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio

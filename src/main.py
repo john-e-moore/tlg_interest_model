@@ -19,7 +19,7 @@ def main(
         interest_rates: Dict[int, float],
         current_gdp_millions: int,
         gdp_growth_rate: float,
-        new_debt_pct_gdp: float,
+        primary_deficit_pct_gdp: float,
         new_debt_interest_rate: float,
         multiplier: float
 ) -> None:
@@ -155,12 +155,12 @@ def main(
         print(f"Issuing new debt with parameters:")
         print(f"GDP in millions: {current_gdp_millions}")
         print(f"GDP growth rate: {gdp_growth_rate}")
-        print(f"Yearly debt to issue as a percentage of GDP: {new_debt_pct_gdp}")
+        print(f"Yearly debt to issue as a percentage of GDP: {primary_deficit_pct_gdp}")
         print(f"Interest rate for new debt: {new_debt_interest_rate}")
         new_debt_payments = issue_new_debt(
             gdp_millions=current_gdp_millions, 
             gdp_growth_rate=gdp_growth_rate, 
-            new_debt_pct_gdp=new_debt_pct_gdp, 
+            primary_deficit_pct_gdp=primary_deficit_pct_gdp, 
             interest_rate=new_debt_interest_rate,
             start_date=max_record_date, 
             end_date=reissue_end_date
@@ -247,7 +247,7 @@ if __name__ == "__main__":
                         help='Current US GDP in millions of dollars.')
     parser.add_argument('--gdp-growth-rate', type=float, default=config['simulation']['gdp_growth_rate'],
                         help='Estimated GDP growth rate.')
-    parser.add_argument('--new-debt-pct-gdp', type=float, default=config['simulation']['new_debt_pct_gdp'],
+    parser.add_argument('--new-debt-pct-gdp', type=float, default=config['simulation']['primary_deficit_pct_gdp'],
                         help='Estimated budget deficit.')
     parser.add_argument('--new-debt-interest-rate', type=float, default=config['simulation']['new_debt_interest_rate'],
                         help='Estimated average Fed Funds rate.')
@@ -268,7 +268,7 @@ if __name__ == "__main__":
         interest_rates=interest_rates_converted,
         current_gdp_millions=args.current_gdp_millions,
         gdp_growth_rate=args.gdp_growth_rate,
-        new_debt_pct_gdp=args.new_debt_pct_gdp,
+        primary_deficit_pct_gdp=args.primary_deficit_pct_gdp,
         new_debt_interest_rate=args.new_debt_interest_rate,
         multiplier=config['simulation']['multiplier']
     )

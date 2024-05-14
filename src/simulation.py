@@ -22,7 +22,7 @@ def compute_future_gdps(
 def issue_new_debt(
     gdp_millions: int,
     gdp_growth_rate: float,
-    new_debt_pct_gdp: float,
+    primary_deficit_pct_gdp: float,
     interest_rate: float,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp
@@ -36,7 +36,7 @@ def issue_new_debt(
     Params:
     gdp_millions: US GDP in millions of dollars.
     gdp_growth_rate: The yearly rate of GDP growth to use.
-    new_debt_pct_gdp: The amount of new debt every year as a percentage of GDP.
+    primary_deficit_pct_gdp: The amount of new debt every year as a percentage of GDP.
     interest_rate: The yearly interest rate to be paid on new debt.
     start_date: Start date.
     end_date: End date.
@@ -53,7 +53,7 @@ def issue_new_debt(
     cumulative_debt = 0
     for year in range(start_year, end_year + 1):
         # Freshly issued debt and associated interest payment
-        new_debt = (current_gdp * new_debt_pct_gdp) / 100
+        new_debt = (current_gdp * primary_deficit_pct_gdp) / 100
         new_debt_interest_payment = (new_debt * interest_rate) / 100
 
         # Add interest payment on cumulative debt
@@ -86,7 +86,7 @@ def reissue_security(
         row: pd.Series, 
         interest_rates: dict, 
         reissue_end_date: pd.Timestamp,
-        laubach=False) -> pd.DataFrame:
+        laubach_rates=False) -> pd.DataFrame:
     """
     All securities issued before max_record_date are already in the data,
     so we start reissuing one day later.
@@ -99,7 +99,7 @@ def reissue_security(
     term_years = term_days / 365
     closest_term_years_index = find_closest_value_index(term_years, list(interest_rates.keys()))
     closest_term_years = list(interest_rates.keys())[closest_term_years_index]
-    if not laubach:
+    if not laubach_rates:
         interest_rate = interest_rates.get(closest_term_years)
     else:
         # Interest rate will be calculated yearly based on debt-to-gdp
