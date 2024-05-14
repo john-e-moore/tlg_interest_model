@@ -6,7 +6,7 @@ import pyarrow
 import argparse
 from typing import Dict
 from utils import load_config, calculate_laubach_interest_rate
-from simulation import calculate_interest_payments, reissue_security, issue_new_debt, compute_future_gdps
+from simulation import calculate_interest_payments_current_year, reissue_security, issue_new_debt, compute_future_gdps
 
 def main(
         raw_data_path: str,
@@ -143,10 +143,12 @@ def main(
     current_gdp = initial_gdp_millions
     current_debt_to_gdp = initial_debt_millions / initial_gdp_millions
     current_interest_rate = initial_interest_rate
-    cumulative_interest_payments = 0
+    # Interest must be continually paid on all new debt assuming a consistent deficit
+    cumulative_new_debt = 0
+    data = dict()
     # Loop by year
     for year in range(max_record_date.year, reissue_end_date.year + 1):
-        print(f"*****{year}*****")
+        print(f"\n*****{year}*****")
         print(f"Debt: {int(current_debt)}")
         print(f"GDP: {int(current_gdp)}")
         print(f"Debt-to-GDP: {round(current_debt_to_gdp, 2)}")
@@ -171,24 +173,49 @@ def main(
         # Apply function to each row
         # On df
         ## if it got issued this year, calculate fraction of year
+        df_year = df[df['year_issued'] == year]
+        print(f"Number of securities issued this year: {len(df_year)}")
+        interest_expense_list = df_year.apply(
+            func=calculate_interest_payments_current_year,
+            axis=1,
+            args=(year,)
+        ).tolist()
+        # Sum the expenses for the year and apply multiplier
+        print(f"Length of interest expense: {len(interest_expense_list)}")
+        total_interest_expense_existing = int(sum(interest_expense_list)) * multiplier
+        print(f"Total interest expense on existing debt: {int(total_interest_expense_existing)}")
+        # Issue new debt for current year equal to primary deficit
+        # NOTE: this method assumes all new debt for year is issued on Jan. 1, may need to fix
+        current_year_new_debt = current_gdp * (primary_deficit_pct_gdp/100)
+        cumulative_new_debt += current_year_new_debt
+        total_interest_expense_new_cumulative = cumulative_new_debt * (current_interest_rate/100)
+        print(f"Total interest expense from debt issued this year: {int(total_interest_expense_new_cumulative)}")
+        # Sum the two interest expense numbers
+        total_interest_expense = total_interest_expense_existing + total_interest_expense_new_cumulative
+        print(f"Total interest expense this year: {int(total_interest_expense)}")
+        print(f"Total interest expense this year as share of GDP: {round(total_interest_expense/current_gdp, 3)}")
 
-        # Increment GDP and debt
-        # GDP increases proportional to gdp_growth_rate from config
+        # Store data
+        data[year] = {
+            'gdp': current_gdp,
+            'debt': current_debt,
+            'debt_to_gdp': current_debt_to_gdp,
+            'interest_rate': current_interest_rate,
+            'interest_expense_on_existing': total_interest_expense_existing,
+            'interest_expense_new_cumulative': total_interest_expense_new_cumulative,
+            'interest_expense_total': total_interest_expense,
+            'interest_expense_share_gdp': round(total_interest_expense/current_gdp, 3)
+        }
+        # Increment GDP and debt for next year
         current_gdp += current_gdp*(gdp_growth_rate/100)
-        # Debt increases by primary_deficit*current_gdp + interest_expense_current_year
-        current_debt += current_gdp*(primary_deficit_pct_gdp/100)
-        # TODO: current_debt += interest_expense_this_year
+        current_debt += current_year_new_debt
+        current_debt += total_interest_expense
         current_debt_to_gdp = current_debt / current_gdp
-        # NOTE: do NOT need to keep running interest expense for the calculation
-        # since it gets added to debt at end of each year
-    # If laubach_rates:
-    #  Calculate debt-to-gdp
-    #  Calculate interest rate
-    #  Fill in interest rate / yield for all securities getting reissued that year
-    # Create new debt equal to primary deficit with current interest rate
-    #  ## issue_new_debt function cannot be used; looping years takes place in main now
-    # Calculate interest expense for current year, then add it to cumulative debt
+    
     df.to_csv('laubach_rates_filled.csv')
+    
+    result = pd.DataFrame.from_dict(data, orient='index')
+    result.to_csv('result.csv')
 
 if __name__ == "__main__":
     """

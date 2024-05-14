@@ -216,3 +216,67 @@ def calculate_interest_payments(row: pd.Series) -> dict:
             result[str(_year)] = interest_payment
     
     return result
+
+################################################################################
+#
+################################################################################
+
+def calculate_interest_payments_current_year(row: pd.Series, year: int) -> int: 
+    """
+    Iterates through the years a security was live and returns a dictionary
+    containing the interest payment for each year.
+
+    Parameters:
+    row: A single row of a Pandas DataFrame
+
+    Returns:
+    {
+        id: 938848,
+        security_type: bond,
+        initial_issue_date: 1/1/2020,
+        maturity_date: 1/1/2024,
+        '2020': 365,
+        '2021': 365,
+        ...
+    }
+    """
+    
+    # Initialize variables
+    ## Years, months, days
+    year_issued = row['year_issued']
+    month_issued = row['month_issued']
+    day_issued = row['day_issued']
+    year_matured = row['year_matured']
+    month_matured = row['month_matured']
+    day_matured = row['day_matured']
+    ## Issued amount
+    issue_amount = row['Issued Amount (in Millions)']
+    ## Is the security same-year or multi-year?
+    if year_issued == year_matured:
+        is_multi_year = False
+    else:
+        is_multi_year = True
+    ## Bonds and Notes use interest rate. Bills don't have one; use yield.
+    if not np.isnan(row['Interest Rate']):
+        interest_rate = row['Interest Rate'] / 100
+
+    else:
+        interest_rate = row['Yield'] / 100
+    
+    # Calculate interest payment
+    if not is_multi_year: # short-term
+        issue_date = row['Issue Date']
+        maturity_date = row['Maturity Date']
+        fraction_of_year_between_issue_and_maturity = calculate_fraction_of_year_between_issue_and_maturity(issue_date, maturity_date)
+        interest_payment = fraction_of_year_between_issue_and_maturity * issue_amount * interest_rate 
+    else: # is_multi_year == True
+        if year == year_issued:
+            fraction_of_year_remaining_after_issue = calculate_fraction_of_year_remaining(month_issued, day_issued)
+            interest_payment = fraction_of_year_remaining_after_issue * issue_amount * interest_rate
+        elif year == year_matured:
+            fraction_of_year_elapsed_before_maturity = calculate_fraction_of_year_elapsed(month_matured, day_matured)
+            interest_payment = fraction_of_year_elapsed_before_maturity * issue_amount * interest_rate
+        else: # Full year
+            interest_payment = issue_amount * interest_rate
+        
+    return interest_payment
