@@ -85,7 +85,8 @@ def issue_new_debt(
 def reissue_security(
         row: pd.Series, 
         interest_rates: dict, 
-        reissue_end_date: pd.Timestamp) -> pd.DataFrame:
+        reissue_end_date: pd.Timestamp,
+        laubach=False) -> pd.DataFrame:
     """
     All securities issued before max_record_date are already in the data,
     so we start reissuing one day later.
@@ -98,7 +99,11 @@ def reissue_security(
     term_years = term_days / 365
     closest_term_years_index = find_closest_value_index(term_years, list(interest_rates.keys()))
     closest_term_years = list(interest_rates.keys())[closest_term_years_index]
-    interest_rate = interest_rates.get(closest_term_years)
+    if not laubach:
+        interest_rate = interest_rates.get(closest_term_years)
+    else:
+        # Interest rate will be calculated yearly based on debt-to-gdp
+        interest_rate = None
     ## Other loop variables
     security_class_1_description = row['Security Class 1 Description']
     security_class_2_description = row['Security Class 2 Description']
