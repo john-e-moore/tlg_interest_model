@@ -105,28 +105,31 @@ def calculate_laubach_interest_rate(
 ################################################################################
 #
 ################################################################################
-def plot_and_save(df, x_col, y_col, filename, use_index=False):
+def plot_and_save(df, x_col, y_cols, filename, use_index=False):
     """
-    Plots two columns of a pandas DataFrame as a line chart and saves the plot as a PNG image.
+    Plots multiple lines for an arbitrary number of columns in a pandas DataFrame and saves the plot as a PNG image.
 
     Parameters:
     df (pd.DataFrame): The DataFrame containing the data to plot.
     x_col (str): The name of the column to use for the x-axis.
-    y_col (str): The name of the column to use for the y-axis.
+    y_cols (list): A list of column names to plot on the y-axis.
     filename (str): The name of the output image file (with .png extension).
     use_index (bool): Whether to use the DataFrame index as the x-axis. Default is False.
     """
     plt.figure(figsize=(10, 6))
     
     if use_index:
-        plt.plot(df.index, df[y_col], marker='o', linestyle='-', color='b')
+        for col in y_cols:
+            plt.plot(df.index, df[col], marker='o', linestyle='-', label=col)
         plt.xlabel('Index')
     else:
-        plt.plot(df[x_col], df[y_col], marker='o', linestyle='-', color='b')
+        for col in y_cols:
+            plt.plot(df[x_col], df[col], marker='o', linestyle='-', label=col)
         plt.xlabel(x_col)
     
-    plt.ylabel(y_col)
-    plt.title(f'{y_col} vs {"Index" if use_index else x_col}')
+    plt.ylabel('Values')
+    plt.title('Multiple Lines Plot')
+    plt.legend(title="Columns")
     plt.grid(True)
     plt.savefig(filename)
     plt.close()
