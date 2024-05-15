@@ -4,8 +4,9 @@ import json
 import pandas as pd
 import pyarrow
 import argparse
+from datetime import datetime
 from typing import Dict
-from utils import load_config, calculate_laubach_interest_rate
+from utils import load_config, calculate_laubach_interest_rate, plot_and_save, plot_stacked_area_and_save
 from simulation import calculate_interest_payments_current_year, reissue_security, issue_new_debt, compute_future_gdps
 
 def main(
@@ -143,15 +144,20 @@ def main(
     current_gdp = initial_gdp_millions
     current_debt_to_gdp = initial_debt_millions / initial_gdp_millions
     current_interest_rate = initial_interest_rate
+
     # Interest must be continually paid on all new debt assuming a consistent deficit
     cumulative_new_debt = 0
-    data = dict()
     # Loop by year
+    data = dict()
+    previous_gdp = 1
+    previous_debt = 1
+    previous_debt_to_gdp = 1
+    previous_interest_rate = 1
     for year in range(max_record_date.year, reissue_end_date.year + 1):
         print(f"\n*****{year}*****")
-        print(f"Debt: {int(current_debt)}")
-        print(f"GDP: {int(current_gdp)}")
-        print(f"Debt-to-GDP: {round(current_debt_to_gdp, 2)}")
+        print(f"Debt: {int(current_debt)}; Pct gain: {round((current_debt - previous_debt) / previous_debt, 4)*100}")
+        print(f"GDP: {int(current_gdp)}; Pct gain: {round((current_gdp - previous_gdp) / previous_gdp, 4)*100}")
+        print(f"Debt-to-GDP: {round(current_debt_to_gdp, 2)}; Pct gain: {round((current_debt_to_gdp - previous_debt_to_gdp) / previous_debt_to_gdp, 4)*100}")
         # NOTE: make sure to account for fractional years in interest payment calc.
         if (laubach_rates) and (year != max_record_date.year):
             current_interest_rate = calculate_laubach_interest_rate(
@@ -161,37 +167,49 @@ def main(
                 laubach_ratio=laubach_ratio
             )
         print(f"Current interest rate: {round(current_interest_rate, 2)}")
+        
         # Fill interest_rate and yield for securities reissued this year
-        if laubach_rates:
-            df.loc[df['year_issued'] == year, 'Interest Rate'] = current_interest_rate
-            df.loc[df['year_issued'] == year, 'Yield'] = current_interest_rate
+        df.loc[df['year_issued'] == year, 'Interest Rate'] = current_interest_rate
+        df.loc[df['year_issued'] == year, 'Yield'] = current_interest_rate
+
         # Set 'previous_' variables for next year
+        previous_gdp = current_gdp
+        previous_debt = current_debt
         previous_debt_to_gdp = current_debt_to_gdp
         previous_interest_rate = current_interest_rate
 
         # Calculate interest expense for this year
-        # Apply function to each row
-        # On df
-        ## if it got issued this year, calculate fraction of year
-        df_year = df[df['year_issued'] == year]
-        print(f"Number of securities issued this year: {len(df_year)}")
+        # Has to include active securities, not just ones issued this year
+        df_year = df[(df['year_issued'] <= year) & (df['year_matured'] >= year)]
+        print(f"Number of securities active this year: {len(df_year)}")
         interest_expense_list = df_year.apply(
             func=calculate_interest_payments_current_year,
             axis=1,
             args=(year,)
         ).tolist()
+
+        # Inspect
+        if year%10 == 0:
+            df_year['interest_expense'] = interest_expense_list
+            df_year.to_csv(f'df_{year}.csv')
+
         # Sum the expenses for the year and apply multiplier
         print(f"Length of interest expense: {len(interest_expense_list)}")
         total_interest_expense_existing = int(sum(interest_expense_list)) * multiplier
         print(f"Total interest expense on existing debt: {int(total_interest_expense_existing)}")
+
         # Issue new debt for current year equal to primary deficit
         # NOTE: this method assumes all new debt for year is issued on Jan. 1, may need to fix
-        current_year_new_debt = current_gdp * (primary_deficit_pct_gdp/100)
-        cumulative_new_debt += current_year_new_debt
-        total_interest_expense_new_cumulative = cumulative_new_debt * (current_interest_rate/100)
-        print(f"Total interest expense from debt issued this year: {int(total_interest_expense_new_cumulative)}")
-        # Sum the two interest expense numbers
-        total_interest_expense = total_interest_expense_existing + total_interest_expense_new_cumulative
+        if new_debt:
+            current_year_new_debt = current_gdp * (primary_deficit_pct_gdp/100)
+            cumulative_new_debt += current_year_new_debt
+            total_interest_expense_new_cumulative = cumulative_new_debt * (current_interest_rate/100)
+            # Sum the two interest expense numbers
+            total_interest_expense = total_interest_expense_existing + total_interest_expense_new_cumulative
+        else:
+            total_interest_expense = total_interest_expense_existing
+
+        print(f"Total interest expense from non-existing debt: {int(total_interest_expense_new_cumulative)}")
         print(f"Total interest expense this year: {int(total_interest_expense)}")
         print(f"Total interest expense this year as share of GDP: {round(total_interest_expense/current_gdp, 3)}")
 
@@ -200,12 +218,17 @@ def main(
             'gdp': current_gdp,
             'debt': current_debt,
             'debt_to_gdp': current_debt_to_gdp,
+            'primary_deficit': current_year_new_debt,
             'interest_rate': current_interest_rate,
-            'interest_expense_on_existing': total_interest_expense_existing,
+            'interest_expense_existing': total_interest_expense_existing,
             'interest_expense_new_cumulative': total_interest_expense_new_cumulative,
             'interest_expense_total': total_interest_expense,
-            'interest_expense_share_gdp': round(total_interest_expense/current_gdp, 3)
+            'interest_expense_existing_pct_gdp': round(total_interest_expense_existing/current_gdp, 3), 
+            'interest_expense_new_cumulative_pct_gdp': round(total_interest_expense_new_cumulative/current_gdp, 3), 
+            'interest_expense_pct_gdp': round(total_interest_expense/current_gdp, 3),
+            'primary_deficit_pct_gdp': round(current_year_new_debt/current_gdp, 3)
         }
+
         # Increment GDP and debt for next year
         current_gdp += current_gdp*(gdp_growth_rate/100)
         current_debt += current_year_new_debt
@@ -213,9 +236,41 @@ def main(
         current_debt_to_gdp = current_debt / current_gdp
     
     df.to_csv('laubach_rates_filled.csv')
-    
+
     result = pd.DataFrame.from_dict(data, orient='index')
     result.to_csv('result.csv')
+
+    # Line plot
+    filename_head = f"plot-debt{str(initial_debt_millions)}-gdp{str(initial_gdp_millions)}-int{str(initial_interest_rate*100)}"
+    if new_debt:
+        filename_head += "-newdebt"
+    if laubach_rates:
+        filename_head += "-laubach"
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = filename_head + timestamp + ".png"
+    plot_and_save(
+        df=result,
+        x_col='',
+        y_col='interest_expense_pct_gdp',
+        filename=filename,
+        use_index=True
+    )
+
+    # Area plot of deficit breakdown
+    filename_area = "area-" + filename_head + timestamp + ".png"
+    plot_stacked_area_and_save(
+        df=result,
+        x_col='',
+        y_cols=[
+            'interest_expense_existing', 
+            'interest_expense_new_cumulative',
+            'primary_deficit'
+        ],
+        filename=filename_area,
+        use_index=True
+    )
+
+    # Area plot of debt-to-gdp vs. 
 
 if __name__ == "__main__":
     """

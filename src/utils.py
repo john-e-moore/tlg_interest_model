@@ -1,5 +1,6 @@
 import yaml
 import pandas as pd
+import matplotlib.pyplot as plt
 from typing import List, Union
 
 def load_config(config_path: str) -> dict:
@@ -100,3 +101,62 @@ def calculate_laubach_interest_rate(
     new_rate = previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio*100
     print(f"New rate: {new_rate}")
     return previous_interest_rate + pct_gain_debt_to_gdp*laubach_ratio*100
+
+################################################################################
+#
+################################################################################
+def plot_and_save(df, x_col, y_col, filename, use_index=False):
+    """
+    Plots two columns of a pandas DataFrame as a line chart and saves the plot as a PNG image.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame containing the data to plot.
+    x_col (str): The name of the column to use for the x-axis.
+    y_col (str): The name of the column to use for the y-axis.
+    filename (str): The name of the output image file (with .png extension).
+    use_index (bool): Whether to use the DataFrame index as the x-axis. Default is False.
+    """
+    plt.figure(figsize=(10, 6))
+    
+    if use_index:
+        plt.plot(df.index, df[y_col], marker='o', linestyle='-', color='b')
+        plt.xlabel('Index')
+    else:
+        plt.plot(df[x_col], df[y_col], marker='o', linestyle='-', color='b')
+        plt.xlabel(x_col)
+    
+    plt.ylabel(y_col)
+    plt.title(f'{y_col} vs {"Index" if use_index else x_col}')
+    plt.grid(True)
+    plt.savefig(filename)
+    plt.close()
+
+################################################################################
+#
+################################################################################
+def plot_stacked_area_and_save(df, x_col, y_cols, filename, use_index=False):
+    """
+    Plots a stacked area chart for an arbitrary number of columns in a pandas DataFrame and saves the plot as a PNG image.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame containing the data to plot.
+    x_col (str): The name of the column to use for the x-axis.
+    y_cols (list): A list of column names to stack on the y-axis.
+    filename (str): The name of the output image file (with .png extension).
+    use_index (bool): Whether to use the DataFrame index as the x-axis. Default is False.
+    """
+    plt.figure(figsize=(10, 6))
+    
+    if use_index:
+        df[y_cols].plot.area(ax=plt.gca(), stacked=True)
+        plt.xlabel('Index')
+    else:
+        df.plot.area(x=x_col, y=y_cols, ax=plt.gca(), stacked=True)
+        plt.xlabel(x_col)
+    
+    plt.ylabel('Values')
+    plt.title('Stacked Area Chart')
+    plt.legend(title="Columns", loc="upper left")
+    plt.grid(True)
+    plt.savefig(filename)
+    plt.close()
