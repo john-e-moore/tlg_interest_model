@@ -4,3 +4,4 @@ pat.txt
 config.yml
 *.csv
 *__pycache__*
+*.png
