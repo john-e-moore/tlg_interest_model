@@ -6,7 +6,7 @@ import pyarrow
 import argparse
 from datetime import datetime
 from typing import Dict
-from utils import load_config, calculate_laubach_interest_rate, plot_and_save, plot_stacked_area_and_save
+from utils import load_config, calculate_laubach_interest_rate, plot_and_save, plot_stacked_area_and_save, calculate_fraction_of_year_remaining
 from simulation import calculate_interest_payments_current_year, reissue_security, issue_new_debt, compute_future_gdps
 
 def main(
@@ -157,7 +157,14 @@ def main(
         print(f"Debt: {int(current_debt)}; Pct gain: {round((current_debt - previous_debt) / previous_debt, 4)*100}")
         print(f"GDP: {int(current_gdp)}; Pct gain: {round((current_gdp - previous_gdp) / previous_gdp, 4)*100}")
         print(f"Debt-to-GDP: {round(current_debt_to_gdp, 2)}; Pct gain: {round((current_debt_to_gdp - previous_debt_to_gdp) / previous_debt_to_gdp, 4)*100}")
-        # NOTE: make sure to account for fractional years in interest payment calc.
+
+        # Change debt and GDP numbers to approximate value at year-end
+        primary_deficit = current_gdp * (primary_deficit_pct_gdp/100)
+        if year == max_record_date.year:
+            current_debt += primary_deficit * calculate_fraction_of_year_remaining(max_record_date.month, max_record_date.day)
+            current_gdp += primary_deficit * calculate_fraction_of_year_remaining(max_record_date.month, max_record_date.day)
+            current_debt_to_gdp = current_debt / current_gdp
+        # Calculate interest rate for the year
         if (laubach_rates) and (year != max_record_date.year):
             current_interest_rate = calculate_laubach_interest_rate(
                 current_debt_to_gdp=current_debt_to_gdp,
@@ -225,7 +232,6 @@ def main(
         print(f"Total interest expense this year as share of GDP: {round(total_interest_expense/current_gdp, 3)}")
 
         # Store data
-        primary_deficit = current_gdp * (primary_deficit_pct_gdp/100)
         data[year] = {
             'gdp': current_gdp,
             'debt': current_debt,
@@ -235,9 +241,9 @@ def main(
             'interest_expense_existing_and_reissued': interest_expense_existing_and_reissued,
             'interest_expense_from_new_debt': interest_expense_from_new_debt,
             'interest_expense_total': total_interest_expense,
-            'interest_expense_existing_and_reissued_pct_gdp': round(interest_expense_existing_and_reissued/current_gdp, 3), 
-            'interest_expense_from_new_debt_pct_gdp': round(interest_expense_from_new_debt/current_gdp, 3), 
-            'total_interest_expense_pct_gdp': round(total_interest_expense/current_gdp, 3),
+            'interest_expense_existing_and_reissued_pct_gdp': round(interest_expense_existing_and_reissued/current_gdp, 4), 
+            'interest_expense_from_new_debt_pct_gdp': round(interest_expense_from_new_debt/current_gdp, 4), 
+            'total_interest_expense_pct_gdp': round(total_interest_expense/current_gdp, 4),
             'primary_deficit_pct_gdp': primary_deficit_pct_gdp
         }
 

@@ -43,4 +43,15 @@ python src/main.py \
   --new-debt-interest-rate 5.0
 ```
 
+Standard yields:
+initial_yields:
+    1: 1.00
+    2: 1.05
+    3: 1.08
+    5: 1.11
+    7: 1.14
+    10: 1.18
+    20: 1.27
+    30: 1.37
+
 Output will be written to the output folder specified in config.
