@@ -84,6 +84,7 @@ def issue_new_debt(
 
 def reissue_security(
         row: pd.Series, 
+        yield_curve: dict,
         interest_rates: dict, 
         reissue_end_date: pd.Timestamp,
         laubach_rates=False) -> pd.DataFrame:
@@ -94,21 +95,26 @@ def reissue_security(
     Returns DataFrame
     """
     # Initialize variables
-    ## Calculate interest rate from term
-    term_days = row['term_days']
-    term_years = term_days / 365
-    closest_term_years_index = find_closest_value_index(term_years, list(interest_rates.keys()))
-    closest_term_years = list(interest_rates.keys())[closest_term_years_index]
-    if not laubach_rates:
-        interest_rate = interest_rates.get(closest_term_years)
-    else:
-        # Interest rate will be calculated yearly based on debt-to-gdp
-        interest_rate = None
-    ## Other loop variables
     security_class_1_description = row['Security Class 1 Description']
     security_class_2_description = row['Security Class 2 Description']
     issued_amount = row['Issued Amount (in Millions)']
     current_issue_date = row['Maturity Date'] + pd.Timedelta(days=1)
+    current_issue_year = current_issue_date.year
+    ## Calculate interest rate from yield curve & interest rates
+    try:
+        short_term_rate = interest_rates[current_issue_year]
+    except KeyError as err: # Set to default long-term rate
+        short_term_rate = interest_rates[9999]
+    term_days = row['term_days']
+    term_years = term_days / 365
+    closest_term_years_index = find_closest_value_index(term_years, list(yield_curve.keys()))
+    closest_term_years = list(yield_curve.keys())[closest_term_years_index]
+    if not laubach_rates:
+        yield_multiplier = yield_curve.get(closest_term_years)
+        interest_rate = short_term_rate * yield_multiplier
+    else:
+        # Interest rate will be calculated yearly based on debt-to-gdp
+        interest_rate = None
 
     # Initialize result DataFrame
     colnames = [
