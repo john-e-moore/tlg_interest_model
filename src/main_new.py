@@ -8,11 +8,13 @@ from datetime import datetime
 from typing import Dict
 from utils import load_config, calculate_laubach_interest_rate, plot_and_save, plot_stacked_area_and_save, calculate_fraction_of_year_remaining
 from simulation import calculate_interest_payments_current_year, reissue_security, issue_new_debt, compute_future_gdps
+from classes.plotter import Plotter
 
 def main(
         raw_data_path: str,
         historical_gdps_path: str,
         output_path: str,
+        plots_dir: str,
         reissue_end_date: pd.Timestamp,
         new_debt: bool, 
         laubach_rates: bool,
@@ -263,6 +265,7 @@ def main(
     result.to_csv('result.csv')
 
     ######### Plots
+    """
     filename_head = f"plot-debt{str(initial_debt_millions)}-gdp{str(initial_gdp_millions)}-int{str(long_term_interest_rate*100)}"
     if new_debt:
         filename_head += "-newdebt"
@@ -319,6 +322,19 @@ def main(
         filename=filename,
         use_index=True
     )
+    """
+
+    ####New plots
+    plotter = Plotter(df=result, output_folder=plots_dir)
+    plotter.plot_line(
+        x_col='',
+        y_cols=['total_interest_expense_pct_gdp'],
+        x_axis_label='Year',
+        y_axis_label='Interest Expense (pct GDP)',
+        filename='interest_pct_gdp',
+        use_index=True
+    )
+    
 
 if __name__ == "__main__":
     """
@@ -369,6 +385,7 @@ if __name__ == "__main__":
         raw_data_path=config['io']['raw_data_path'],
         historical_gdps_path=config['io']['historical_gdps_path'],
         output_path=config['io']['output_path'],
+        plots_dir=config['io']['plots_dir'],
         reissue_end_date=pd.to_datetime(config['simulation']['reissue_end_date']),
         new_debt=args.new_debt, 
         laubach_rates=args.laubach_rates,
