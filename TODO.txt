@@ -2,4 +2,7 @@
 - Output plots in addition to .csv. For instance double y-axis with interest expense and GDP.
 * Refactor / classes
 * Use API + Lambda function to download new data monthly. Pass 'Fields' parameter.
+ * Read most recent file from S3 rather than locally.
+* Figure out how to add TIPS and FRN
+* Allow issuance of mix of treasuries each year
 * Add fiscal year capability.

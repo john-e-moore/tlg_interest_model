@@ -38,6 +38,10 @@ class Plotter:
         plt.savefig(os.path.join(self.output_folder, filepath_full))
         plt.close()
 
+    ################################################################################
+    #
+    ################################################################################
+
     def plot_stacked_area(self, 
                           x_col: Union[str, None], 
                           y_cols: List[str], 
@@ -62,6 +66,10 @@ class Plotter:
         filepath_full = f'{filename}_{timestamp}.png'
         plt.savefig(os.path.join(self.output_folder, filepath_full))
         plt.close()
+    
+    ################################################################################
+    #
+    ################################################################################
 
     def plot_bar(self, 
                  x_col: Union[str, None], 
@@ -95,6 +103,10 @@ class Plotter:
         filepath_full = f'{filename}_{timestamp}.png'
         plt.savefig(os.path.join(self.output_folder, filepath_full))
         plt.close()
+    
+    ################################################################################
+    #
+    ################################################################################
 
     def plot_histogram(self, 
                        x_col: str, 
