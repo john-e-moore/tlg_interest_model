@@ -183,10 +183,21 @@ def main(
         df.loc[df['year_issued'] == year, 'Interest Rate'] = current_interest_rate
         df.loc[df['year_issued'] == year, 'Yield'] = current_interest_rate
 
-        # Calculate interest expense for this year
-        # Has to include active securities, not just ones issued this year
+        # TODO: Calculate weighted average yield paid on securities
+        # Weight by issued amount then fraction of year
         df_year = df[(df['year_issued'] <= year) & (df['year_matured'] >= year)]
         print(f"Number of securities active this year: {len(df_year)}")
+
+        # Filter out non-security rows (totals and stuff)
+        df_year['Issued Amount (in Millions)'] = pd.to_numeric(df_year['Issued Amount (in Millions)'], errors='coerce')
+        df_year['Yield'] = pd.to_numeric(df_year['Yield'], errors='coerce')
+        df_year = df_year[~df_year['Issued Amount (in Millions)'].isna() & ~df_year['Yield'].isna()]
+
+        weighted_average_yield = (df_year['Yield'] * df_year['Issued Amount (in Millions)']).sum() / df_year['Issued Amount (in Millions)'].sum()
+        print(f"Weighted average yield: {weighted_average_yield}")
+
+        # Calculate interest expense for this year
+        # Has to include active securities, not just ones issued this year
         interest_expense_list = df_year.apply(
             func=calculate_interest_payments_current_year,
             axis=1,
@@ -238,6 +249,7 @@ def main(
             'debt_to_gdp': current_debt_to_gdp,
             'primary_deficit': primary_deficit,
             'interest_rate': current_interest_rate,
+            'weighted_average_yield': round(weighted_average_yield, 2),
             'interest_expense_existing_and_reissued': interest_expense_existing_and_reissued,
             'interest_expense_from_new_debt': interest_expense_from_new_debt,
             'interest_expense_total': total_interest_expense,
