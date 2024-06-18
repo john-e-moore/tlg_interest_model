@@ -275,6 +275,7 @@ def main(
     result.to_csv('result.csv')
 
     ######### Plots
+    plots_folder = "plots/"
     filename_head = f"plot-debt{str(initial_debt_millions)}-gdp{str(initial_gdp_millions)}-int{str(long_term_interest_rate*100)}"
     if new_debt:
         filename_head += "-newdebt"
@@ -283,7 +284,7 @@ def main(
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
     # Line plot
-    filename = filename_head + timestamp + ".png"
+    filename = plots_folder + filename_head + timestamp + ".png"
     plot_and_save(
         df=result,
         x_col='',
@@ -293,7 +294,7 @@ def main(
     )
 
     # Area plot of interest expense as share of GDP
-    filename = "interest-pct-gdp-" + filename_head + timestamp + ".png"
+    filename = plots_folder + "interest-pct-gdp-" + filename_head + timestamp + ".png"
     plot_stacked_area_and_save(
         df=result,
         x_col='',
@@ -306,7 +307,7 @@ def main(
     )
 
     # Area plot of interest expense in millions of dollars
-    filename = "interest-total-" + filename_head + timestamp + ".png"
+    filename = plots_folder + "interest-total-" + filename_head + timestamp + ".png"
     plot_stacked_area_and_save(
         df=result,
         x_col='',
@@ -319,7 +320,7 @@ def main(
     )
 
     # Area plot of gdp, debt, and interest expense 
-    filename = "gdpdebt-" + filename_head + timestamp + ".png"
+    filename = plots_folder + "gdpdebt-" + filename_head + timestamp + ".png"
     plot_and_save(
         df=result,
         x_col='',
