@@ -1,5 +1,5 @@
 io:
-  raw_data_path: /home/john/tlg/interest_model/data/MSPD_DetailSecty_20010131_20240331.csv
+  raw_data_path: /home/john/tlg/interest_model/data/MSPD_DetailSecty_20010131_20240531.csv
   historical_gdps_path: /home/john/tlg/interest_model/data/historical_gdps.csv
   output_path: /home/john/tlg/interest_model/data/output.csv
   plots_dir: /home/john/tlg/interest_model/plots
@@ -22,6 +22,6 @@ simulation:
   gdp_millions: 29176000 # For old model, this should be the estimated GDP at end of current year
   initial_debt_millions: 36380000 # same as above
   gdp_growth_rate: 5.0 # CBO 3.0% core inflation and 2.0% real gdp growth
-  new_debt_pct_gdp: 3.2 # Primary deficit
+  new_debt_pct_gdp: 7.0 # Total deficit (primary in new version)
   multiplier: 1.19
   
