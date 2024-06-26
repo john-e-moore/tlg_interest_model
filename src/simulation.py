@@ -9,7 +9,7 @@ def compute_future_gdps(
     end_date: pd.Timestamp
 ) -> dict:
     gdps = {}
-    start_year = start_date.year
+    start_year = start_date.year + 1 # Start next year
     end_year = end_date.year
     current_gdp = gdp_millions
 

@@ -1,0 +1,27 @@
+io:
+  raw_data_path: /home/john/tlg/interest_model/data/MSPD_DetailSecty_20010131_20240331.csv
+  historical_gdps_path: /home/john/tlg/interest_model/data/historical_gdps.csv
+  output_path: /home/john/tlg/interest_model/data/output.csv
+  plots_dir: /home/john/tlg/interest_model/plots
+simulation:
+  reissue_end_date: 2054-12-31
+  security_types: 
+    - Notes
+    - Bonds
+    - Bills Maturity Value
+  interest_rates_default:
+    1: 4.2
+    2: 3.8
+    3: 3.6
+    5: 3.4
+    7: 3.4
+    10: 3.4
+    20: 3.4
+    30: 3.5
+  new_debt_interest_rate: 3.7
+  gdp_millions: 29176000 # For old model, this should be the estimated GDP at end of current year
+  initial_debt_millions: 36380000 # same as above
+  gdp_growth_rate: 5.0 # CBO 3.0% core inflation and 2.0% real gdp growth
+  new_debt_pct_gdp: 3.2 # Primary deficit
+  multiplier: 1.19
+  
